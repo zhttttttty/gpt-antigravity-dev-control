@@ -71,7 +71,7 @@ def dispatch_one(task_id):
         # Bring task branch evidence into local temporary worktree for review.
         wt=ROOT/'.worktrees'/task_id; wt.parent.mkdir(exist_ok=True)
         if not wt.exists(): run('git','worktree','add',str(wt),f'origin/{branch}')
-        ev='';
+        ev=''
         for n in ['task.yaml','brief.md','context.md','receipt.executor.yaml','rollback.md']:
             matches=list((wt/'.ai/tasks').glob(f'*/{task_id}/{n}'))
             if matches: ev+=f'\n## {n}\n'+matches[0].read_text()
@@ -90,7 +90,7 @@ def dispatch_one(task_id):
 def scan_ready():
     base=ROOT/'.ai/tasks/queue'; return sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
 def status():
-    c=db(); rows=c.execute('SELECT task_id,fs_state,runtime_state,risk,attempt,last_error FROM task_runtime ORDER BY task_id').fetchall(); c.close();
+    c=db(); rows=c.execute('SELECT task_id,fs_state,runtime_state,risk,attempt,last_error FROM task_runtime ORDER BY task_id').fetchall(); c.close()
     for r in rows: print(dict(r))
 def approve(task_id,by,note=''):
     c=db(); c.execute('INSERT INTO approvals(task_id,approval_type,approved_by,note,created_at) VALUES(?,?,?,?,?)',(task_id,'human_merge',by,note,now())); c.commit(); c.close(); print(f'approved {task_id} by {by}')
@@ -104,10 +104,17 @@ def main():
     elif ns.cmd=='once': init_db(); ids=[ns.task_id] if ns.task_id else scan_ready(); [dispatch_one(x) for x in ids]
     elif ns.cmd=='loop':
         init_db()
+        poll_seconds=int(cfg().get('orchestrator',{}).get('poll_seconds',10))
         while True:
             ids=scan_ready()
-            if not ids: break if ns.until_idle else time.sleep(10)
-            for x in ids: dispatch_one(x)
-            if ns.until_idle: break
+            if not ids:
+                if ns.until_idle:
+                    break
+                time.sleep(poll_seconds)
+                continue
+            for x in ids:
+                dispatch_one(x)
+            if not ns.until_idle:
+                time.sleep(poll_seconds)
     elif ns.cmd=='approve': init_db(); approve(ns.task_id,ns.by,ns.note)
 if __name__=='__main__': main()

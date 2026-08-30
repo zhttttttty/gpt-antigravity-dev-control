@@ -1,0 +1,16 @@
+schema_version: 2
+project: <PROJECT_NAME>
+phase: initialization
+current_milestone: null
+current_epic: null
+active_tasks: []
+review_queue: []
+blocked_tasks: []
+completed_tasks: []
+next_ready_tasks: []
+architecture_version: 1
+requirements_version: 1
+last_verified_commit: null
+known_issues: []
+technical_debt: []
+last_updated_at: null

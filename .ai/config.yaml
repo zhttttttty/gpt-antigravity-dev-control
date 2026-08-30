@@ -1,0 +1,96 @@
+schema_version: 2
+control_plane: gpt56-antigravity
+canonical_root: .ai
+fail_closed: true
+fresh_context_per_task: true
+
+roles:
+  architect:
+    preferred_model: gpt-5.6-sol
+    authority: architecture
+  planner:
+    preferred_model: gpt-5.6-sol
+    authority: task_contract
+  executor:
+    preferred_tool: antigravity
+    preferred_model: gemini
+    authority: bounded_implementation
+  reviewer:
+    preferred_model: gpt-5.6-sol
+    authority: acceptance
+  human:
+    authority: final
+
+state_machine:
+  READY:
+    folder: .ai/tasks/queue
+    next: [IN_PROGRESS, BLOCKED]
+  IN_PROGRESS:
+    folder: .ai/tasks/active
+    next: [REVIEW, BLOCKED]
+  REVIEW:
+    folder: .ai/tasks/review
+    next: [DONE, READY, BLOCKED]
+  BLOCKED:
+    folder: .ai/tasks/blocked
+    next: [READY]
+  DONE:
+    folder: .ai/tasks/done
+    next: [ARCHIVED]
+  ARCHIVED:
+    folder: .ai/tasks/archive
+    next: []
+
+risk_gates:
+  low:
+    worktree: recommended
+    executor_receipt: required
+    automated_tests: targeted_when_available
+    qa_receipt: required
+    independent_review: required
+    human_merge_approval: optional
+  medium:
+    worktree: required
+    executor_receipt: required
+    automated_tests: required_when_available
+    regression_check: required
+    qa_receipt: required
+    independent_review: required
+    human_merge_approval: optional
+  high:
+    worktree: required
+    executor_receipt: required
+    automated_tests: required_when_available
+    regression_check: required
+    qa_receipt: required
+    independent_review: required
+    cross_family_review: required_or_human_waiver
+    rollback_plan: required
+    human_merge_approval: required
+
+isolation:
+  worktree_root: .worktrees
+  branch_prefix: ai/
+  protect_base_branch: true
+
+architecture_gate:
+  database_schema: true
+  public_api_contract: true
+  auth_model: true
+  security_boundary: true
+  core_framework: true
+  deployment_topology: true
+  external_service: true
+  persistent_state_semantics: true
+  major_dependency: true
+  breaking_compatibility: true
+
+review:
+  verdicts: [PASS, PASS_WITH_NOTES, REWORK, BLOCKED]
+  reviewer_may_edit_implementation: false
+  executor_may_self_approve: false
+
+receipts:
+  executor: receipt.executor.yaml
+  qa: receipt.qa.yaml
+  review: review.yaml

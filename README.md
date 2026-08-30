@@ -1,3 +1,3 @@
 # gpt-antigravity-dev-control
 
-Repository initialization. The full V2/V3 Lite control plane is being committed in subsequent commits.
+GPT-5.6 Sol × Antigravity development control plane.

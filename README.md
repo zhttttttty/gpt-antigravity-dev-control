@@ -29,7 +29,7 @@ flowchart TD
 | Mode | Branch | Best for | Flow |
 |---|---|---|---|
 | V2 Manual | `v2` | small projects, 5–20 tasks, transparent manual control | GPT → task → Antigravity → review |
-| V3 Lite | `main` | long-running projects, repeated review loops, multi-task automation | GPT → Orchestrator → Antigravity → GPT review |
+| V3 Lite | `main` | long-running projects, repeated review loops, automation experiments | GPT → Orchestrator → Antigravity → GPT review |
 
 V3 Lite **does not replace V2**. It automates the same task contracts, receipts, risk gates and Git worktree rules.
 
@@ -74,6 +74,7 @@ python .ai/scripts/ai.py start TASK-001 --worktree
 - [Quick Start](docs/QUICK_START.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [V2 vs V3 Lite](docs/V2_V3_COMPARISON.md)
+- [Current limitations](docs/LIMITATIONS.md)
 - [AI workflow details](README_AI_WORKFLOW.md)
 - [V3 Orchestrator](.ai/orchestrator/README.md)
 - [Risk Gates](.ai/rules/RISK_GATES.md)
@@ -83,7 +84,7 @@ python .ai/scripts/ai.py start TASK-001 --worktree
 
 Current line: **V3 Lite / 3.0.0-lite**. The repository is intentionally lightweight: no Redis, Kubernetes, message broker or web dashboard is required.
 
-Provider model/API names can change over time. Treat `.ai/orchestrator/config.yaml` as configuration rather than a permanent compatibility promise.
+The V2 protocol is the stable conceptual core; V3 Lite should be treated as an evolving reference automation layer. Provider model/API names can change over time, so verify `.ai/orchestrator/config.yaml` before real execution.
 
 ## License
 

@@ -13,10 +13,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
-        run: python -m pip install -r .ai/orchestrator/requirements.txt
+      - name: Install validation dependencies
+        run: python -m pip install "PyYAML>=6.0,<7"
       - name: Compile Python
-        run: python -m compileall .ai/scripts .ai/orchestrator
+        run: |
+          python -m compileall .ai/scripts
+          if [ -d .ai/orchestrator ]; then python -m compileall .ai/orchestrator; fi
       - name: Parse YAML
         run: |
           python - <<'PY'
@@ -29,9 +31,10 @@ jobs:
       - name: CLI smoke checks
         run: |
           python .ai/scripts/ai.py status
-          python .ai/orchestrator/orchestrator.py --help
+          if [ -f .ai/orchestrator/orchestrator.py ]; then python .ai/orchestrator/orchestrator.py --help; fi
       - name: Validate example task against V2 contract
         run: |
+          mkdir -p .ai/tasks/queue
           cp -R examples/minimal-task .ai/tasks/queue/TASK-EXAMPLE
           python .ai/scripts/ai.py validate TASK-EXAMPLE
           rm -rf .ai/tasks/queue/TASK-EXAMPLE

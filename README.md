@@ -1,30 +1,90 @@
 # gpt-antigravity-dev-control
 
-A repository-native development control plane for using **GPT-5.6 Sol** as PM / Architect / Planner / Reviewer and **Antigravity / Gemini** as bounded Executor.
+[中文说明](README.zh-CN.md)
 
-## Versions
+Repository-native AI development control plane for pairing **GPT-5.6 Sol** as PM / Architect / Planner / Reviewer with **Antigravity / Gemini** as a bounded implementation executor.
 
-- **`v2` branch** — protocol/manual workflow: task state machine, structured `task.yaml`, Risk Gates, Receipts, `GEMINI.md`, Git Worktree isolation and review gates.
-- **`main` branch** — **V3 Lite**: V2 protocol plus SQLite coordination, leases, automated Antigravity dispatch and GPT-5.6 review orchestration.
+![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 
-## Core model
+## Why
 
-```text
-Human intent
-   ↓
-GPT-5.6 Sol — plan / architecture
-   ↓
-V2 task.yaml contract
-   ↓
-V3 Lite Orchestrator
-   ↓
-Antigravity — implement / test / receipt
-   ↓
-GPT-5.6 Sol — independent review
-   ↓
-PASS / REWORK / BLOCKED / human risk gate
+The project separates **planning**, **execution**, **evidence**, and **review** so an implementation agent cannot silently redefine its own task or declare itself successful.
+
+```mermaid
+flowchart TD
+    H[Human intent] --> G[GPT-5.6 Sol\nPlan / Architecture]
+    G --> T[task.yaml contract]
+    T --> O[V3 Lite Orchestrator]
+    O --> A[Antigravity / Gemini\nImplement + Test]
+    A --> E[Executor Receipt]
+    E --> R[GPT-5.6 Sol\nIndependent Review]
+    R -->|PASS| D[DONE]
+    R -->|REWORK| T
+    R -->|HIGH risk| X[Human Approval Gate]
+    X --> D
 ```
 
-Start with [`README_AI_WORKFLOW.md`](README_AI_WORKFLOW.md) and [`.ai/orchestrator/README.md`](.ai/orchestrator/README.md).
+## Two operating modes
 
-The repository, not chat history, is the durable source of truth.
+| Mode | Branch | Best for | Flow |
+|---|---|---|---|
+| V2 Manual | `v2` | small projects, 5–20 tasks, transparent manual control | GPT → task → Antigravity → review |
+| V3 Lite | `main` | long-running projects, repeated review loops, multi-task automation | GPT → Orchestrator → Antigravity → GPT review |
+
+V3 Lite **does not replace V2**. It automates the same task contracts, receipts, risk gates and Git worktree rules.
+
+## Quick start
+
+```bash
+git clone https://github.com/zhttttttty/gpt-antigravity-dev-control.git
+cd gpt-antigravity-dev-control
+python -m pip install -r .ai/orchestrator/requirements.txt
+python .ai/orchestrator/orchestrator.py init
+python .ai/orchestrator/orchestrator.py status
+```
+
+For real V3 execution, set `OPENAI_API_KEY` and `GEMINI_API_KEY`. Private repositories also need `ANTIGRAVITY_GITHUB_PAT`.
+
+Run queued work:
+
+```bash
+python .ai/orchestrator/orchestrator.py loop --until-idle
+```
+
+For manual V2 usage:
+
+```bash
+python .ai/scripts/ai.py status
+python .ai/scripts/ai.py validate TASK-001
+python .ai/scripts/ai.py start TASK-001 --worktree
+```
+
+## Core guarantees
+
+- `.ai/` is the canonical project control plane.
+- `task.yaml` defines scope, authority, risk and acceptance criteria.
+- Executor `COMPLETE` is not reviewer `PASS`.
+- Medium/high-risk implementation uses isolated Git worktrees.
+- High-risk work cannot reach DONE without required gates and human approval.
+- REWORK preserves prior attempt evidence under `history/attempt-N/`.
+- SQLite in V3 Lite is coordination state; Git + task artifacts remain durable truth.
+
+## Documentation
+
+- [Quick Start](docs/QUICK_START.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [V2 vs V3 Lite](docs/V2_V3_COMPARISON.md)
+- [AI workflow details](README_AI_WORKFLOW.md)
+- [V3 Orchestrator](.ai/orchestrator/README.md)
+- [Risk Gates](.ai/rules/RISK_GATES.md)
+- [Example task](examples/minimal-task/README.md)
+
+## Status
+
+Current line: **V3 Lite / 3.0.0-lite**. The repository is intentionally lightweight: no Redis, Kubernetes, message broker or web dashboard is required.
+
+Provider model/API names can change over time. Treat `.ai/orchestrator/config.yaml` as configuration rather than a permanent compatibility promise.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

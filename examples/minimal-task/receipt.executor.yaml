@@ -1,0 +1,17 @@
+schema_version: 2
+task_id: TASK-EXAMPLE
+contract_revision: 1
+attempt: 1
+executor: antigravity
+status: NOT_STARTED
+workspace: {path: null, branch: null, base_commit: null, head_commit: null}
+started_at: null
+ended_at: null
+changed_files: []
+commands: []
+acceptance_evidence: []
+scope_check: {result: UNKNOWN, out_of_scope_files: []}
+architecture_deviation: {result: NONE, details: null}
+known_issues: []
+unverified_items: []
+notes: null

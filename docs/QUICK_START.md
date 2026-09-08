@@ -1,3 +1,9 @@
+# Recommended: V3.1 local delegation
+
+Start with [Local Delegation](LOCAL_DELEGATION.md). It needs Git, Python, PyYAML
+and a working local agy login; no OpenAI reviewer API key. The guide below
+documents the retained V2 and optional experimental V3 Lite paths.
+
 # Quick Start
 
 ## 1. Choose a mode

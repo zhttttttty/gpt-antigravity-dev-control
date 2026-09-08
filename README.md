@@ -4,6 +4,24 @@
 
 Repository-native AI development control plane for pairing **GPT-5.6 Sol** as PM / Architect / Planner / Reviewer with **Antigravity / Gemini** as a bounded implementation executor.
 
+## V3.1: local-first delegation (recommended)
+
+Codex plans and accepts; local `agy` implements in a Git worktree. Compact
+receipts come back first; full logs remain local. No reviewer API key, automatic
+merge or unattended loop is required. Small tasks stay direct.
+
+```sh
+python -m pip install -r .ai/scripts/requirements-local.txt
+python .ai/scripts/delegate.py probe
+python .ai/scripts/delegate.py --help
+```
+
+Use the repo-scoped `$antigravity-delegate` skill, then follow the
+[V3.1 guide](docs/LOCAL_DELEGATION.md) to prepare a task and approve a launch.
+CLI discovery is not login verification. agy 1.0.10 help was checked for print
+mode; real provider execution still depends on local login and permissions.
+See [cost measurement](COST_METRICS.md); no token-savings percentage is promised.
+
 ![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 
 ## Why
@@ -14,7 +32,7 @@ The project separates **planning**, **execution**, **evidence**, and **review** 
 flowchart TD
     H[Human intent] --> G[GPT-5.6 Sol\nPlan / Architecture]
     G --> T[task.yaml contract]
-    T --> O[V3 Lite Orchestrator]
+    T --> O[V3.1 Local CLI + Worktree]
     O --> A[Antigravity / Gemini\nImplement + Test]
     A --> E[Executor Receipt]
     E --> R[GPT-5.6 Sol\nIndependent Review]
@@ -24,16 +42,17 @@ flowchart TD
     X --> D
 ```
 
-## Two operating modes
+## Operating modes
 
 | Mode | Branch | Best for | Flow |
 |---|---|---|---|
 | V2 Manual | `v2` | small projects, 5–20 tasks, transparent manual control | GPT → task → Antigravity → review |
+| V3.1 Local | `main` after integration | local-first, bounded implementation with human confirmation | Codex → local agy/worktree → compact receipt → Codex |
 | V3 Lite | `main` | long-running projects, repeated review loops, automation experiments | GPT → Orchestrator → Antigravity → GPT review |
 
 V3 Lite **does not replace V2**. It automates the same task contracts, receipts, risk gates and Git worktree rules.
 
-## Quick start
+## Optional V3 Lite remote quick start (experimental)
 
 ```bash
 git clone https://github.com/zhttttttty/gpt-antigravity-dev-control.git
@@ -82,7 +101,7 @@ python .ai/scripts/ai.py start TASK-001 --worktree
 
 ## Status
 
-Current line: **V3 Lite / 3.0.0-lite**. The repository is intentionally lightweight: no Redis, Kubernetes, message broker or web dashboard is required.
+Current line: **V3.1 / 3.1.0-local**. The repository is intentionally lightweight: no Redis, Kubernetes, message broker or web dashboard is required.
 
 The V2 protocol is the stable conceptual core; V3 Lite should be treated as an evolving reference automation layer. Provider model/API names can change over time, so verify `.ai/orchestrator/config.yaml` before real execution.
 

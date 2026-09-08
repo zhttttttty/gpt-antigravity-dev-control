@@ -1,3 +1,11 @@
+# 3.1.0-local
+
+- Add local routing, confirmed worktree preparation, agy print-mode adapter,
+  compact receipt collection and preserved local evidence.
+- Add repo-scoped Codex delegation skill and measured-cost guidance.
+- Preserve V2 state/review gates and experimental V3 Lite remote code.
+- Add offline Git/process integration tests; no automatic merge or retry loop.
+
 # Changelog
 
 All notable changes are documented here.

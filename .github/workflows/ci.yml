@@ -18,6 +18,7 @@ jobs:
       - name: Compile Python
         run: |
           python -m compileall .ai/scripts
+          python -m compileall .ai/adapters .agents/skills
           if [ -d .ai/orchestrator ]; then python -m compileall .ai/orchestrator; fi
       - name: Parse YAML
         run: |
@@ -31,6 +32,7 @@ jobs:
       - name: CLI smoke checks
         run: |
           python .ai/scripts/ai.py status
+          python .ai/scripts/delegate.py --help
           if [ -f .ai/orchestrator/orchestrator.py ]; then python .ai/orchestrator/orchestrator.py --help; fi
       - name: Validate example task against V2 contract
         run: |
@@ -38,3 +40,5 @@ jobs:
           cp -R examples/minimal-task .ai/tasks/queue/TASK-EXAMPLE
           python .ai/scripts/ai.py validate TASK-EXAMPLE
           rm -rf .ai/tasks/queue/TASK-EXAMPLE
+      - name: Local delegation regression tests (no provider calls)
+        run: python -m unittest discover -s tests -v

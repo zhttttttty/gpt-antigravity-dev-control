@@ -1,3 +1,11 @@
+# V3.1 local limitations
+
+The local path is implemented separately; see [its recovery and limitation
+details](LOCAL_DELEGATION.md). It needs actual agy login/tool permissions and does
+not automate merge, independent verification, retries, runtime backup or crash
+recovery. Compact receipts distinguish observed Git state from executor-reported
+tests. The original V2/V3 Lite limitations below remain relevant to those paths.
+
 # Current Limitations
 
 V3 Lite is intentionally a lightweight reference implementation, not a production distributed scheduler.

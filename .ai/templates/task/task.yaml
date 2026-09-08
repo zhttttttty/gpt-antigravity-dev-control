@@ -5,6 +5,16 @@ status: READY
 contract_revision: 1
 attempt: 1
 
+# Optional V3.1 routing. Legacy tasks without execution remain direct.
+execution:
+  mode: direct
+  adapter: antigravity_cli
+  model: configured_default
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 2
+  escalation: codex_review
+
 planning:
   milestone: M1
   epic: EPIC-001

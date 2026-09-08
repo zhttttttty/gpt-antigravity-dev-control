@@ -1,5 +1,14 @@
 # Architecture
 
+## Preferred V3.1 local path
+
+Codex skill → `.ai/scripts/delegate.py` → executor interface / local agy →
+isolated Git worktree → compact receipt → independent Codex review → human merge.
+The controller uses the existing V2 state machine, with no remote reviewer call.
+Runtime logs are local evidence, not a second authoritative task queue.
+See [ADR-001](../.ai/decisions/ADR-001-local-delegation.md) and
+[local operations](LOCAL_DELEGATION.md). The older automation layer below remains optional.
+
 ## Layers
 
 ```mermaid

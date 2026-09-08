@@ -22,6 +22,12 @@ CLI discovery is not login verification. agy 1.0.10 help was checked for print
 mode; real provider execution still depends on local login and permissions.
 See [cost measurement](COST_METRICS.md); no token-savings percentage is promised.
 
+Real interactive-assisted validation passed (6 tests + 14 independent cases).
+Prefer `launch --interactive` in a terminal for approvals. Print-mode silent
+permission denial now becomes `NEEDS_ATTENTION`; use `diagnose` and at most one
+confirmed interactive `--recover`, not automatic retries. Unattended operation
+has not been validated.
+
 ![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 
 ## Why

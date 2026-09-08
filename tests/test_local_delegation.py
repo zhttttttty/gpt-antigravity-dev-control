@@ -7,13 +7,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / ".ai/scripts"))
 import delegate as d
-from antigravity_cli import AntigravityCLI
+from antigravity_cli import AntigravityCLI, diagnose
 
 
 class TaskDumper(yaml.SafeDumper):
@@ -192,7 +193,8 @@ class LocalDelegationTests(unittest.TestCase):
         self.prepare()
         adapter = AntigravityCLI(sys.executable, ["-c", "print('launch only')"], 5)
         record = d.launch(self.root, "TASK-TEST", adapter, True)
-        self.assertEqual(record["phase"], "AWAITING_RECEIPT")
+        self.assertEqual(record["phase"], "NEEDS_ATTENTION")
+        self.assertEqual(record["launch"]["diagnostic"], "NO_COMPLETION_EVIDENCE")
         with self.assertRaisesRegex(ValueError, "only once"):
             d.launch(self.root, "TASK-TEST", adapter, True)
         with self.assertRaisesRegex(ValueError, "not complete"):
@@ -255,6 +257,93 @@ class LocalDelegationTests(unittest.TestCase):
         result = self.collect()
         self.assertEqual(result["scope_check"], "FAIL")
         self.assertIn("outside.txt", result["changed_files_preview"])
+
+    def test_permission_diagnostic_is_sanitized(self):
+        log = self.root / "fake-cli.log"
+        log.write_text('access_token=SECRET\nPrint mode: soft-denying tool confirmation "ViewFile" at step 2')
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "PERMISSION_BLOCKED")
+        log.write_text('You are not logged into Antigravity.')
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "AUTH_REQUIRED")
+        log.write_text('You are not logged into Antigravity.\nPrint mode: silent auth succeeded')
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "RECEIPT_MISSING")
+
+    def test_receipt_diagnostic_does_not_approve(self):
+        p = self.root / "receipt.yaml"
+        p.write_text('status: COMPLETE\n')
+        self.assertEqual(diagnose(p, []), "RECEIPT_PRESENT_UNVERIFIED")
+        p.write_text('[')
+        self.assertEqual(diagnose(p, []), "RECEIPT_INVALID")
+        p.write_text('x' * 128001)
+        self.assertEqual(diagnose(p, []), "RECEIPT_INVALID")
+
+    def test_interactive_requires_tty_before_state_mutation(self):
+        self.prepare()
+        with patch('antigravity_cli.sys.stdin.isatty', return_value=False):
+            with self.assertRaisesRegex(ValueError, "real terminal"):
+                d.launch(self.root, "TASK-TEST", AntigravityCLI(sys.executable, interactive=True), True)
+        self.assertEqual(d.latest(self.root, "TASK-TEST")[1]["phase"], "PREPARED")
+
+    def test_interactive_inherits_terminal_and_keeps_permissions(self):
+        logs = self.root / ".ai/runtime/interactive"; logs.mkdir(parents=True)
+        receipt = logs / "receipt.yaml"; receipt.write_text('status: COMPLETE\n')
+        adapter = AntigravityCLI(sys.executable, interactive=True)
+        with patch('antigravity_cli.sys.stdin.isatty', return_value=True), \
+             patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
+             patch('antigravity_cli.subprocess.run') as run:
+            run.return_value.returncode = 0
+            result = adapter.launch(self.root, logs / "context.md", receipt, logs)
+        argv = run.call_args.args[0]
+        self.assertIn('-i', argv)
+        self.assertIn('--add-dir', argv)
+        self.assertNotIn('--dangerously-skip-permissions', argv)
+        self.assertNotIn('stdin', run.call_args.kwargs)
+        self.assertNotIn('stdout', run.call_args.kwargs)
+        self.assertEqual(result['diagnostic'], 'RECEIPT_PRESENT_UNVERIFIED')
+
+    def test_one_interactive_recovery_preserves_logs(self):
+        self.prepare()
+        d.launch(self.root, 'TASK-TEST', AntigravityCLI(sys.executable, ['-c', "print('first')"], 5), True)
+        class InteractiveFixture:
+            interactive = True
+            def validate_launch(self): pass
+            def launch(self, worktree, context, receipt, logs):
+                (logs / 'launch.log').write_text('second')
+                return {'exit_code': 0, 'diagnostic': 'NO_COMPLETION_EVIDENCE', 'log': str(logs / 'launch.log')}
+        record = d.launch(self.root, 'TASK-TEST', InteractiveFixture(), True, recover=True)
+        self.assertEqual(len(record['launch_history']), 2)
+        self.assertIn('first', (Path(record['run_dir']) / 'launch-1/launch.log').read_text())
+        self.assertEqual((Path(record['run_dir']) / 'launch-2/launch.log').read_text(), 'second')
+        with self.assertRaisesRegex(ValueError, 'budget exhausted'):
+            d.launch(self.root, 'TASK-TEST', InteractiveFixture(), True, recover=True)
+
+    def test_recovery_cannot_be_unconfirmed_or_print(self):
+        self.prepare()
+        adapter = AntigravityCLI(sys.executable, ['-c', 'pass'], 5)
+        d.launch(self.root, 'TASK-TEST', adapter, True)
+        with self.assertRaisesRegex(ValueError, 'confirmation'):
+            d.launch(self.root, 'TASK-TEST', adapter, recover=True)
+        with self.assertRaisesRegex(ValueError, '--interactive'):
+            d.launch(self.root, 'TASK-TEST', adapter, True, recover=True)
+
+    def test_status_available_while_mutation_lock_held(self):
+        self.prepare()
+        with d.lock(self.root):
+            cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+                                 '--repo', str(self.root), 'status', 'TASK-TEST'],
+                                capture_output=True, text=True)
+        self.assertEqual(cp.returncode, 0, cp.stderr)
+        self.assertEqual(json.loads(cp.stdout)['phase'], 'PREPARED')
+
+    def test_print_no_receipt_cli_exits_nonzero(self):
+        self.prepare()
+        argsfile = self.root / '.ai/runtime/argv.json'
+        argsfile.write_text(json.dumps(['-c', "print('not completion')"]))
+        cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+                             '--repo', str(self.root), 'launch', 'TASK-TEST', '--approve',
+                             '--executable', sys.executable, '--args-file', str(argsfile)],
+                            capture_output=True, text=True)
+        self.assertEqual(cp.returncode, 2, cp.stderr)
+        self.assertEqual(json.loads(cp.stdout)['phase'], 'NEEDS_ATTENTION')
 
 
 if __name__ == "__main__":

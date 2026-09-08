@@ -1,5 +1,11 @@
 # 3.1.0-local
 
+- Add terminal-inheriting interactive launch and one confirmed recovery with
+  separate logs; reject redirected interactive sessions before changing state.
+- Detect permission-denied/no-receipt exits as NEEDS_ATTENTION, expose sanitized
+  diagnostic categories, and strengthen worktree-only executor prompts.
+- Document the assisted real-task validation and its unresolved unattended limits.
+
 - Add local routing, confirmed worktree preparation, agy print-mode adapter,
   compact receipt collection and preserved local evidence.
 - Add repo-scoped Codex delegation skill and measured-cost guidance.

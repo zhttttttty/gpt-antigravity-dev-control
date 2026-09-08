@@ -13,6 +13,11 @@ python .ai/scripts/delegate.py --help
 小任务直接执行；大块独立任务委派；高风险先审批。默认不会自动重试或合并。
 已检查 agy 1.0.10 帮助中的 `-p`、`--print-timeout`，登录与真实任务能力需实测。
 
+真实交互辅助测试已通过：6 个单元测试及 14 个独立边界检查。
+推荐在终端使用 `launch --interactive` 逐项审批。无完成证据的零退出码现在
+返回 `NEEDS_ATTENTION`；可用 `diagnose` 排查，并显式执行一次交互 `--recover`。
+这不代表无人值守已验证，也不启用全局免确认。
+
 - [V3.1 操作与恢复指南](docs/LOCAL_DELEGATION.md)
 - [用量测量方法](COST_METRICS.md)：不保证固定 Token 节省比例。
 

@@ -28,6 +28,21 @@ and `-p <prompt>` from the isolated worktree. It does not parse stdout as JSON:
 agy prints text, and the executor must write the structured receipt file.
 The model remains the CLI's configured default. No Hermes installation is needed.
 
+### Recommended: interactive approvals
+
+```sh
+python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
+```
+
+Run in a real terminal/PTY (not a redirected job). The controller inherits its
+terminal, invokes `-i` with explicit `--add-dir` and an absolute context path,
+and lets the user approve scoped operations. Initialization may require terms,
+privacy choices and folder trust. Do not enable global bypass. After the receipt
+is written, exit the interactive CLI to return to the controller and collect.
+Interactive output includes the TUI followed by the final controller JSON; it
+is not a JSON-only stream. `launch.log` notes that terminal output is not captured;
+`agy.log` contains CLI diagnostics and can include private data, so keep it local.
+
 Help/version success does **not** prove authentication or tool permissions.
 Authenticate interactively when prompted. The controller does not add
 `--dangerously-skip-permissions`. A noninteractive permission prompt may require
@@ -60,7 +75,7 @@ installing in a different scope; do not assume a permanent global install path.
 python .ai/scripts/ai.py validate TASK-001
 python .ai/scripts/delegate.py route TASK-001
 python .ai/scripts/delegate.py prepare TASK-001 --approve
-python .ai/scripts/delegate.py launch TASK-001 --approve --executable /absolute/path/to/agy
+python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
 python .ai/scripts/delegate.py status TASK-001
 python .ai/scripts/delegate.py collect TASK-001
 ```
@@ -135,7 +150,20 @@ model to review, never merges and never declares DONE.
   discovery failed. Probe does not make a model call.
 - Launcher timeout/nonzero: inspect launch.log. The direct process is terminated
   on timeout, but descendants/remote work may continue. Do not blindly relaunch.
-- Launch is one-shot for a prepared run; manual completion may still be collected
+- A print-mode exit 0 without a terminal receipt is `NEEDS_ATTENTION` (exit 2),
+  not successful dispatch. Run `diagnose TASK-001`: fixed categories include
+  PERMISSION_BLOCKED, AUTH_REQUIRED, RECEIPT_MISSING/INVALID and
+  NO_COMPLETION_EVIDENCE. Detection scans only bounded tails of this launch's
+  logs and is best-effort; it never prints account/credential log lines. A final
+  receipt remains unverified until collect and independent review.
+- For a stopped NEEDS_ATTENTION/LAUNCH_FAILED run, inspect processes and worktree,
+  then explicitly confirm one recovery with
+  `launch TASK-001 --approve --interactive --recover --executable /path/to/agy`.
+  Each run permits at most two launches (initial plus one interactive recovery),
+  stored separately under `launch-1/` and `launch-2/`. This is distinct from the
+  task's maximum implementation-attempt budget. Failed recovery escalates to
+  review, never an automatic loop. A launch still running cannot be recovered.
+- Launch is one-shot without explicit recovery; manual completion may still be collected
   after a failed launch. PREPARED can also be completed through the interactive
   CLI using the generated context without invoking launch.
 - Missing/dirty receipt: fix the executor artifacts and collect again. Scope or
@@ -160,7 +188,14 @@ python -m compileall .ai/scripts .ai/adapters .agents/skills
 Tests use temporary Git repositories and a native Python subprocess fixture;
 they do not spend Antigravity quota or demonstrate Gemini coding quality.
 
-Implementation-time checks on Windows: agy 1.0.10 version/help succeeded.
-A minimal `-p` connection prompt with a 30-second print timeout exited 0 but
-returned no captured text. This is **inconclusive**, not a verified login or
-end-to-end model task. Resolve this locally before trusting real delegation.
+Real-task checks on Windows: the agy launcher reported 1.0.10 and interactive
+UI reported runtime 1.1.27. Print mode soft-denied ViewFile and exited 0 with no
+code. Interactive-assisted execution subsequently authored a normalization
+function, six passing test methods and a local commit. Independent review reran
+those six tests and checked fourteen additional inputs, all passing. Collection
+verified three in-scope changed files and moved the task to REVIEW without merge.
+Multiple approvals and corrections were needed, including Windows shell-writing
+failures and out-of-worktree read requests (denied). This validates assisted
+execution, not unattended reliability, coding quality generally, or token savings.
+The newer interactive CLI entry and diagnostics are covered by regression tests;
+do not confuse the earlier manually launched real run with a new end-to-end run.

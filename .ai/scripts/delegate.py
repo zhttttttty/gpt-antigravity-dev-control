@@ -20,7 +20,7 @@ import yaml
 import ai
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
-from antigravity_cli import AntigravityCLI
+from antigravity_cli import AntigravityCLI, diagnose
 from executor_interface import Executor
 
 
@@ -206,24 +206,45 @@ def latest(root, ident):
     return path, json.loads(path.read_text(encoding="utf-8"))
 
 
-def launch(root, ident, adapter: Executor, approved=False):
+def launch(root, ident, adapter: Executor, approved=False, recover=False):
     if not approved:
         raise ValueError("Launch confirmation required: --approve")
     path, record = latest(root, ident)
-    if record["phase"] != "PREPARED":
+    if recover:
+        if not getattr(adapter, "interactive", False):
+            raise ValueError("Recovery requires --interactive; no automatic print retry")
+        if record["phase"] not in {"NEEDS_ATTENTION", "LAUNCH_FAILED"}:
+            raise ValueError("Recovery requires a stopped, unsuccessful launch")
+        if len(record.get("launch_history", [record.get("launch")])) >= 2:
+            raise ValueError("Interactive recovery budget exhausted; escalate to review")
+    elif record["phase"] != "PREPARED":
         raise ValueError("Launch only once per prepared run; inspect logs instead of duplicate dispatch")
     state, _, task = load_task(root, ident)
     if state != "IN_PROGRESS" or digest(task) != record["contract_sha256"]:
         raise ValueError("Task state/contract changed")
     worktree = Path(record["worktree"])
+    if git(worktree, "branch", "--show-current") != record["branch"]:
+        raise ValueError("Worktree branch changed")
+    adapter.validate_launch()
+    history = record.setdefault("launch_history", [])
+    if not history and record.get("launch"):
+        history.append(record["launch"])
+    launch_dir = path.parent / f"launch-{len(history) + 1}"
+    launch_dir.mkdir(exist_ok=False)
     record["phase"] = "LAUNCHING"
     save(path, record)
     try:
         result = adapter.launch(worktree, worktree / ".ai/runtime/delegation/context.md",
-                                worktree / ".ai/runtime/delegation/receipt.executor.yaml", path.parent)
-        record.update(launch=result, phase="AWAITING_RECEIPT" if result["exit_code"] == 0 else "LAUNCH_FAILED")
+                                worktree / ".ai/runtime/delegation/receipt.executor.yaml", launch_dir)
+        phase = "LAUNCH_FAILED" if result["exit_code"] != 0 else (
+            "AWAITING_RECEIPT" if result.get("diagnostic") == "RECEIPT_PRESENT_UNVERIFIED" else "NEEDS_ATTENTION")
+        history.append(result)
+        record.update(launch=result, phase=phase)
     except BaseException as exc:
         record.update(phase="LAUNCH_FAILED", error=str(exc))
+        failure = {"exit_code": None, "error": str(exc), "completion": "UNKNOWN", "log": str(launch_dir / "launch.log")}
+        record["launch"] = failure
+        history.append(failure)
         raise
     finally:
         save(path, record)
@@ -241,7 +262,7 @@ def collect(root, ident):
     path, record = latest(root, ident)
     if record["phase"] == "COLLECTED":
         return json.loads((path.parent / "receipt.compact.json").read_text(encoding="utf-8"))
-    if record["phase"] not in {"PREPARED", "AWAITING_RECEIPT", "LAUNCH_FAILED"}:
+    if record["phase"] not in {"PREPARED", "AWAITING_RECEIPT", "LAUNCH_FAILED", "NEEDS_ATTENTION"}:
         raise ValueError("Run is not ready for collection; inspect run.json")
     state, folder, task = load_task(root, ident)
     if state != "IN_PROGRESS" or digest(task) != record["contract_sha256"]:
@@ -319,7 +340,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("probe")
     p.add_argument("--executable", default="agy")
-    for command in ("route", "prepare", "launch", "collect", "status"):
+    for command in ("route", "prepare", "launch", "collect", "status", "diagnose"):
         p = sub.add_parser(command)
         p.add_argument("task_id")
         if command in {"prepare", "launch"}:
@@ -330,10 +351,15 @@ def main():
             p.add_argument("--executable", default="agy")
             p.add_argument("--args-file", type=Path)
             p.add_argument("--timeout", type=int, default=1260)
+            p.add_argument("--interactive", action="store_true", help="Inherit a real terminal for scoped approvals (recommended)")
+            p.add_argument("--recover", action="store_true", help="One explicitly confirmed interactive recovery after a stopped launch")
     args = parser.parse_args()
     try:
         root = Path(git(args.repo.resolve(), "rev-parse", "--show-toplevel")).resolve()
-        with lock(root):
+        # Atomic run records can be observed while an interactive launch holds
+        # the mutation lock; status/diagnostics must not block behind the TUI.
+        guard = contextlib.nullcontext() if args.command in {"route", "status", "diagnose"} else lock(root)
+        with guard:
             if args.command == "probe":
                 result = AntigravityCLI(args.executable).probe(root / ".ai/runtime/logs/probe")
             elif args.command == "route":
@@ -343,13 +369,20 @@ def main():
                 result = prepare(root, args.task_id, args.approve, args.approval_file)
             elif args.command == "launch":
                 argv = json.loads(args.args_file.read_text(encoding="utf-8")) if args.args_file else None
-                result = launch(root, args.task_id, AntigravityCLI(args.executable, argv, args.timeout), args.approve)
+                result = launch(root, args.task_id, AntigravityCLI(args.executable, argv, args.timeout, args.interactive), args.approve, args.recover)
             elif args.command == "collect":
                 result = collect(root, args.task_id)
+            elif args.command == "diagnose":
+                _, record = latest(root, args.task_id)
+                last_launch = record.get("launch", {})
+                logs = [Path(last_launch[k]) for k in ("log", "cli_log") if last_launch.get(k)]
+                result = {"task_id": args.task_id, "phase": record["phase"],
+                          "diagnostic": diagnose(Path(record["worktree"]) / ".ai/runtime/delegation/receipt.executor.yaml", logs),
+                          "next_step": "Collect completed evidence, or inspect local logs and use confirmed interactive recovery; never infer success from exit 0"}
             else:
                 _, result = latest(root, args.task_id)
         print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 2 if result.get("available") is False or result.get("phase") == "LAUNCH_FAILED" or result.get("status") == "BLOCKED" else 0
+        return 2 if result.get("available") is False or result.get("phase") in {"LAUNCH_FAILED", "NEEDS_ATTENTION"} or result.get("status") == "BLOCKED" else 0
     except (ValueError, OSError, subprocess.SubprocessError, yaml.YAMLError, KeyError, TypeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2

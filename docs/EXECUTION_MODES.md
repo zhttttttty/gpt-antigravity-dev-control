@@ -1,7 +1,7 @@
 # Execution Modes
 
-Execution routing is part of the single task contract, not a choice between two
-product versions.
+Execution routing is part of the task contract. It lets the planner choose the
+cheapest execution path while preserving the same evidence and review rules.
 
 ```yaml
 execution:
@@ -43,6 +43,3 @@ artifact is required before preparation; review and human merge remain separate.
 | REWORK | Previous attempt evidence preserved |
 | Acceptance | Independent review |
 | Merge | Human-controlled |
-
-Historical `v2` and `archive/v3-lite` branches are release snapshots, not active
-execution choices on `main`.

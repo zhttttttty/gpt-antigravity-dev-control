@@ -5,7 +5,7 @@
 统一流程：**Codex 规划与验收 → 按任务路由直接实施或交给本地 Antigravity →
 精简回执 → 人工合并**。
 
-项目现在只有一套核心协议和一个主要命令入口，不再把 V2 与 V3.1 描述成两套模式。
+项目只有一套任务协议和一个主要命令入口，通过 `execution.mode` 选择直接执行、本地委派或审批后委派。
 
 ## 快速开始
 
@@ -63,17 +63,18 @@ python .ai/scripts/control.py collect TASK-001
 
 ## 文档
 
+### 使用指南
+
 - [快速开始](docs/QUICK_START.md)
 - [统一控制流程](docs/CONTROL_WORKFLOW.md)
-- [执行模式](docs/EXECUTION_MODES.md)
 - [本地委派与恢复](docs/LOCAL_DELEGATION.md)
+
+### 技术说明
+
+- [文档索引](docs/README.md)
+- [执行模式](docs/EXECUTION_MODES.md)
 - [架构](docs/ARCHITECTURE.md)
 - [当前限制](docs/LIMITATIONS.md)
 - [用量测量](COST_METRICS.md)
 
-## 历史分支
-
-- `v2`：纯手动协议历史基线。
-- [`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite)：已移除的远程 API / SQLite 调度实验。
-
-它们都不再是 `main` 上需要选择的运行模式。当前版本：**3.1.2-local**。
+当前版本：**3.1.2-local**。

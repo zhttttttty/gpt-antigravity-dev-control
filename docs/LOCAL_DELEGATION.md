@@ -2,8 +2,8 @@
 
 **Codex plans and reviews; Antigravity implements; a human approves merge.**
 No remote reviewer API, automatic merge, background scheduler or automatic retry
-is required. Core Protocol artifacts remain the durable baseline. The removed V3 Lite code is
-preserved only on `archive/v3-lite`.
+is required. Task contracts, receipts, Git history and local runtime evidence
+remain the durable project record.
 
 ## Setup
 
@@ -130,7 +130,7 @@ Prepare creates `.worktrees/TASK-001-1` on `ai/local/TASK-001-1`, records the ba
 SHA and contract digest, and moves the controller checkout's task to IN_PROGRESS.
 The execution branch retains the original committed task snapshot. Only the
 controller checkout owns state transitions; do not run another queue worker on
-the worktree. Do not run local and remote controllers on the same task.
+the worktree. Do not run two controllers against the same task or worktree.
 
 The context pack has a hard **32KB UTF-8 limit**, not an estimated token limit.
 It contains the task, brief, context and rollback; code/rules are read on demand.

@@ -19,5 +19,3 @@ than a distributed automation platform.
 - No fixed token, time, or cost reduction is guaranteed. Measure real tasks.
 
 Detailed operational failure handling is in [Local Delegation](LOCAL_DELEGATION.md).
-The removed V3 Lite implementation remains available only on
-[`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite).

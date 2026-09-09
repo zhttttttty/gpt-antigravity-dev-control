@@ -6,7 +6,7 @@ A local-first AI development control plane: **Codex plans and reviews;
 Antigravity / Gemini implements bounded tasks in Git worktrees; humans approve
 high-risk work and merge**.
 
-There is one protocol and one primary CLI. Per-task `execution.mode` selects
+There is one task protocol and one primary CLI. Per-task `execution.mode` selects
 direct implementation, local delegation, or approval-required delegation.
 
 ## Quick start
@@ -95,26 +95,25 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ## Documentation
 
+### Usage
+
 - [Quick Start](docs/QUICK_START.md)
 - [Control Workflow](docs/CONTROL_WORKFLOW.md)
-- [Execution Modes](docs/EXECUTION_MODES.md)
 - [Local Delegation Operations](docs/LOCAL_DELEGATION.md)
+
+### Technical reference
+
+- [Documentation map](docs/README.md)
+- [Execution Modes](docs/EXECUTION_MODES.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Current Limitations](docs/LIMITATIONS.md)
 - [Cost Measurement](COST_METRICS.md)
 - [Risk Gates](.ai/rules/RISK_GATES.md)
 
-## Historical branches
-
-- `v2`: manual-protocol historical baseline.
-- [`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite): removed remote API/SQLite scheduler experiment.
-
-Neither is a separate operating mode on `main`.
-
 ## Status
 
-Current version: **3.1.2-local**. The primary product is the unified local control
-workflow; no remote scheduler, reviewer API, or fixed token-savings claim.
+Current version: **3.1.2-local**. The project is a local control workflow; no
+remote scheduler, reviewer API, or fixed token-savings claim is required.
 
 ## License
 

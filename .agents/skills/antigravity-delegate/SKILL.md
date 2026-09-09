@@ -1,53 +1,83 @@
 ---
 name: antigravity-delegate
-description: Delegate a bounded implementation task in this control-plane repository to local Antigravity CLI, then inspect compact evidence for independent review. Use for explicit local delegation or larger independently testable implementation work, not trivial edits.
+description: "Run the repository's complete Codex-controlled AI development workflow: plan a task, choose direct or local Antigravity execution, prepare an isolated worktree, collect compact evidence, and review the result. Use for bounded implementation or when the user asks Codex to operate the control plane end to end."
 ---
 
-# Local delegation
+# Codex-controlled development
 
-Codex owns planning and acceptance; Antigravity implements once. Do not repeat
-its implementation. Keep small edits direct. Choose `approval_required` for
-architecture, auth, migration, deployment, billing or destructive work.
+Codex owns the plan, task contract, routing decision, independent review, and
+final recommendation. Antigravity is only a local implementation subprocess
+started by Codex through the repository CLI. Do not introduce Hermes, a remote
+orchestrator, a reviewer API, a background scheduler, or automatic merge.
 
-Use the repository CLI, not a second orchestrator or remote reviewer API:
+Use the unified entry point from the target repository:
 
-1. Prepare a Core Protocol task with the execution block described in
-   [task protocol](references/task-protocol.md). Commit the task and use a clean
-   checkout whose HEAD equals its configured base. Run `route TASK-ID`.
-2. Run `probe --executable <native-agy-path>` and inspect its help/version logs.
-   Existence and help success do not verify login. The shipped print-mode args
-   were checked against agy 1.0.10; verify when versions change. Never enable
-   permission bypass just to make noninteractive execution work.
-3. Obtain user confirmation before `prepare TASK-ID --approve`, and a recorded
-   contract-bound pre-review approval for gated work. `prepare` creates an
-   isolated worktree and a compact context file without a model call.
-4. Prefer `launch TASK-ID --approve --interactive --executable <path>` in a real
-   terminal/PTY. It inherits the terminal for scoped approvals; do not redirect
-   stdin/stdout. User consent is needed for terms/privacy choices; never select
-   data sharing or global permission bypass on their behalf. Exit the executor
-   after it writes the receipt. Outer timeout should be at least 1260 seconds.
-   Without --interactive the CLI uses print mode, which can silently deny tools.
-   A zero exit without a final receipt now returns NEEDS_ATTENTION and exit 2.
-   Run `diagnose TASK-ID`. Once the process has stopped, one explicit
-   `launch TASK-ID --approve --interactive --recover --executable <path>` is
-   permitted; it preserves the first launch's logs. Do not loop retries.
-   For a deliberately trusted disposable worktree, add `--full-access` together
-   with `--approve`. This forwards agy's `--dangerously-skip-permissions`; it is
-   opt-in, recorded, and still subject to receipt, scope and review checks. It
-   does not grant Windows administrator rights or sandbox other directories.
-5. Run `collect TASK-ID`. Read the compact receipt first. Follow
-   [receipt protocol](references/receipt-protocol.md) for missing evidence,
-   targeted diffs, review and rework. Do not read full logs by default.
+    python .ai/scripts/control.py <command>
 
-Run from the target repository: `python .ai/scripts/control.py <command>`.
-The optional skill wrapper accepts `--repo <absolute-repository-path>` and
-forwards to that repository's CLI; inspect a new repository before executing it.
-Do not merge/release automatically. Full usage values remain unknown unless
-measured; this skill does not promise savings.
+The older ai.py and delegate.py files are compatibility modules behind this
+entry point. Read [the Codex workflow reference](references/codex-workflow.md)
+for the full lifecycle and [the task protocol reference](references/task-protocol.md)
+when creating or editing a contract.
 
-Keep executor file/search paths inside the exact worktree. Deny requests for
-user-home/parent access unrelated to the task and steer back to the contract.
-Prefer native file tools on Windows; shell quoting failed during real testing.
-After the receipt is written, stop executor exploration: QA and review belong
-to Codex. Reports must distinguish interactive-assisted success from unattended
-execution, and tests from model-written claims.
+## Select an execution mode
+
+- direct: small edits, documentation, configuration, or work where delegation
+  overhead is larger than implementation effort.
+- delegated: bounded multi-file implementation, tests, or refactors that can
+  be checked in an isolated worktree.
+- approval_required: architecture, authentication, security, migrations,
+  deployment, billing, destructive operations, or any task whose risk/authority
+  fields require human approval.
+
+Missing execution defaults to direct. Never upgrade a task's authority or expand
+its writable scope to make delegation easier.
+
+## Codex-only operating procedure
+
+1. Read the repository instructions and inspect the task/project artifacts.
+2. Create or update a bounded task contract, acceptance checks, and execution
+   mode. Validate and route it:
+
+       python .ai/scripts/control.py validate TASK-ID
+       python .ai/scripts/control.py route TASK-ID
+
+3. For direct work, use the control-plane state/worktree commands and implement
+   within the contract.
+4. For delegated work, obtain confirmation immediately before mutation, then:
+
+       python .ai/scripts/control.py prepare TASK-ID --approve
+       python .ai/scripts/control.py launch TASK-ID --approve --interactive --executable PATH
+
+   Run the command from a real Codex terminal/PTY so scoped prompts, terms,
+   privacy choices, and folder trust remain visible. Do not redirect the
+   interactive terminal. Probe/help success proves discovery only, not login.
+5. After the executor writes its receipt, collect the compact result:
+
+       python .ai/scripts/control.py status TASK-ID
+       python .ai/scripts/control.py collect TASK-ID
+
+   Read the summary first. Inspect full logs only when the summary or review
+   identifies a specific question.
+6. Codex independently checks the exact diff, receipt, required commands, and
+   acceptance evidence. Collection leads to REVIEW, never directly to DONE.
+   Write QA/review artifacts, apply the state transition, and leave merge as an
+   explicit human action.
+
+## Recovery and full access
+
+If a launch exits without a valid receipt, treat it as NEEDS_ATTENTION:
+
+    python .ai/scripts/control.py diagnose TASK-ID
+
+Inspect the run and worktree before one explicitly confirmed interactive
+recovery. Do not loop retries or infer success from exit code 0.
+
+For a disposable trusted worktree only, --full-access --approve may be added to
+the interactive launch. It forwards agy's permission-bypass flag; it does not
+grant administrator rights, constrain filesystem access, or remove scope,
+receipt, review, or merge gates. Never enable it silently.
+
+Use [the receipt protocol reference](references/receipt-protocol.md) for missing
+evidence, scope failures, REWORK, BLOCKED tasks, and review handoff. Keep all
+runtime logs, context packs, and credentials local; never put secrets in task
+contracts or receipts.

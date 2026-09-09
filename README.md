@@ -38,8 +38,16 @@ python .ai/scripts/control.py launch TASK-001 --approve --interactive
 python .ai/scripts/control.py collect TASK-001
 ```
 
-The older `ai.py` and `delegate.py` commands remain compatibility entry points;
-new usage should use `control.py`.
+The older ai.py and delegate.py commands remain compatibility entry points;
+new usage should use control.py.
+
+## Use it inside Codex
+
+The repository includes a discoverable skill at
+.agents/skills/antigravity-delegate. In a Codex task opened on this checkout,
+invoke $antigravity-delegate. Codex then owns the planning, command execution,
+receipt collection, review, and recovery flow; agy is started only as the local
+implementation subprocess.
 
 ![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 

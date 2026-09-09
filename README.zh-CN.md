@@ -46,7 +46,13 @@ python .ai/scripts/control.py launch TASK-001 --approve --interactive --executab
 python .ai/scripts/control.py collect TASK-001
 ```
 
-原 `ai.py` 和 `delegate.py` 暂时保留为兼容入口，新使用方式统一采用 `control.py`。
+原 ai.py 和 delegate.py 暂时保留为兼容入口，新使用方式统一采用 control.py。
+
+## 在 Codex 中使用
+
+仓库内置可发现技能：.agents/skills/antigravity-delegate。在当前仓库的
+Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执行、回执收集、
+验收和恢复；agy 只作为 Codex 启动的本地实现子进程。
 
 一次性可信 Worktree 如需免逐项确认，可显式增加 `--full-access`。它只向 agy
 传递 `--dangerously-skip-permissions`，不授予 Windows 管理员权限，也不会绕过

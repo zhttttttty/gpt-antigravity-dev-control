@@ -1,5 +1,7 @@
 # Local Delegation Operations
 
+[中文](LOCAL_DELEGATION.zh-CN.md)
+
 **Codex plans and reviews; Antigravity implements; a human approves merge.**
 No remote reviewer API, automatic merge, background scheduler or automatic retry
 is required. Task contracts, receipts, Git history and local runtime evidence

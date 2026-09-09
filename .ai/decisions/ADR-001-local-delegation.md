@@ -1,5 +1,7 @@
 # ADR-001: Local delegation inside the unified control plane
 
+[中文](ADR-001-local-delegation.zh-CN.md)
+
 Status: accepted and unified with the Core Protocol.
 
 Keep the task contract, state machine, receipts and merge gates. Add local Git

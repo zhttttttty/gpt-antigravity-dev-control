@@ -1,5 +1,7 @@
 # Architecture
 
+[中文](ARCHITECTURE.zh-CN.md)
+
 ## Unified local-first path
 
 Codex skill → `.ai/scripts/control.py` → Core Protocol or local agy adapter →

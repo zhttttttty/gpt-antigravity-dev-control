@@ -1,5 +1,7 @@
 # Unified Local Control Workflow
 
+[中文](CONTROL_WORKFLOW.zh-CN.md)
+
 ## Roles
 
 - **Codex**: requirements, architecture, task contracts, routing, and independent review.

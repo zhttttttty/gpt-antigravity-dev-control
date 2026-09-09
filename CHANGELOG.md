@@ -1,5 +1,7 @@
 # Changelog
 
+[中文](CHANGELOG.zh-CN.md)
+
 All notable changes are documented here.
 
 ## [3.1.2-local] - 2026-09-09

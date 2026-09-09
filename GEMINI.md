@@ -1,5 +1,7 @@
 # Local executor entry
 
+[中文](GEMINI.zh-CN.md)
+
 When launched with a local delegation context, implement only its contract in
 the supplied worktree. Do not run the controller or mutate task/state files.
 Commit implementation changes and write the executor receipt to the runtime path in

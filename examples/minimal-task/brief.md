@@ -1,5 +1,7 @@
 # TASK-EXAMPLE — Greeting helper
 
+[中文](brief.zh-CN.md)
+
 ## Why
 Demonstrate a bounded, independently reviewable task.
 

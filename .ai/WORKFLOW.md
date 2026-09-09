@@ -1,5 +1,7 @@
 # Unified Operating Workflow
 
+[中文](WORKFLOW.zh-CN.md)
+
 ## 1. Plan
 
 Codex reads canonical project/state artifacts, defines one bounded task, selects

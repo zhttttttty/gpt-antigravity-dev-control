@@ -1,5 +1,7 @@
 # Documentation Map
 
+[中文](README.zh-CN.md)
+
 This project is organized around one local task-control workflow. The documents
 below describe how to use it and how it works internally.
 

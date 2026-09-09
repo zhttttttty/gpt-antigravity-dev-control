@@ -1,5 +1,7 @@
 # Contributing
 
+[中文](CONTRIBUTING.zh-CN.md)
+
 Contributions are welcome.
 
 ## Principles

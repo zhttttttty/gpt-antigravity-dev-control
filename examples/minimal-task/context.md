@@ -1,5 +1,7 @@
 # Task Context
 
+[中文](context.zh-CN.md)
+
 ## Relevant Architecture
 - No architecture change is allowed.
 

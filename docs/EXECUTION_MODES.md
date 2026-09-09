@@ -1,5 +1,7 @@
 # Execution Modes
 
+[中文](EXECUTION_MODES.zh-CN.md)
+
 Execution routing is part of the task contract. It lets the planner choose the
 cheapest execution path while preserving the same evidence and review rules.
 

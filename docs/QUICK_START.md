@@ -1,5 +1,7 @@
 # Quick Start
 
+[中文](QUICK_START.zh-CN.md)
+
 ## 1. Install and inspect
 
 ```sh

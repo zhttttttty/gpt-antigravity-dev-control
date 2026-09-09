@@ -1,5 +1,7 @@
 # Minimal Task Example
 
+[中文](README.zh-CN.md)
+
 This folder demonstrates the smallest complete Core Protocol task bundle. It is intentionally outside `.ai/tasks/` so it does not become active work.
 
 To test it locally:

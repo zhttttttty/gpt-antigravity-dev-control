@@ -1,5 +1,7 @@
 # Current limitations
 
+[中文](LIMITATIONS.zh-CN.md)
+
 The control plane is intentionally local and human-supervised rather
 than a distributed automation platform.
 

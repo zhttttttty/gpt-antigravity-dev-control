@@ -1,5 +1,7 @@
 # Cost metrics (measure, do not promise savings)
 
+[中文](COST_METRICS.zh-CN.md)
+
 Compare similarly scoped tasks completed directly by Codex and through local
 delegation. Include both products' consumption, elapsed time, review effort,
 rework and human intervention. Never equate CLI stdout bytes with billed tokens.

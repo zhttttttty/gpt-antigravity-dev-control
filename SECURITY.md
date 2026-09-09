@@ -1,5 +1,7 @@
 # Security Policy
 
+[中文](SECURITY.zh-CN.md)
+
 ## Reporting
 
 Do not publish API keys, GitHub PATs, private repository credentials or other secrets in issues, task receipts or logs.

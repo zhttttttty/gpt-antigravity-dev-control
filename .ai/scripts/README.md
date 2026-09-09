@@ -1,5 +1,7 @@
 # Unified Control CLI
 
+[中文](README.zh-CN.md)
+
 Use one primary entry point:
 
 ```sh

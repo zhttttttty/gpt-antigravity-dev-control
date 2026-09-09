@@ -64,6 +64,6 @@ try {
     Write-Output $json
     exit 0
 } catch {
-    Write-Error (@{ error = $_.Exception.Message } | ConvertTo-Json -Compress)
+    [Console]::Error.WriteLine((@{ error = $_.Exception.Message } | ConvertTo-Json -Compress))
     exit 2
 }

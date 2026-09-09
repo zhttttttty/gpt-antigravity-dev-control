@@ -91,6 +91,6 @@ try {
         headless = "UNVERIFIED"
     }
     $json = $errorResult | ConvertTo-Json -Depth 10
-    Write-Error $json
+    [Console]::Error.WriteLine($json)
     exit 2
 }

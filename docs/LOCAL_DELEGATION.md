@@ -3,8 +3,8 @@
 [中文](LOCAL_DELEGATION.zh-CN.md)
 
 **Codex plans and reviews; Antigravity implements; a human approves merge.**
-No remote reviewer API, automatic merge, background scheduler or automatic retry
-is required. Task contracts, receipts, Git history and local runtime evidence
+No remote reviewer API, automatic merge, or background scheduler is required.
+Bounded local multi-agent runs may retry one failed shard once. Task contracts, receipts, Git history and local runtime evidence
 remain the durable project record.
 
 ## Setup
@@ -81,8 +81,14 @@ powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps
 ```
 
 The launcher caps concurrency at two and keeps `sessions.json`, reports, stderr,
-and execution logs together. `git ls-files` plus non-ignored untracked files is
-the authoritative inventory; enumeration alone is not semantic reading.
+and execution logs together. Task entries may declare `depends_on`,
+`max_retries`, and `timeout_seconds`. Dependencies are validated as a DAG;
+read-only agents may share a Worktree, while any writer receives exclusive
+Worktree access. The first failure is retried once at most and reduces the rest
+of the run to one concurrent agent. A user-local lock prevents overlapping
+launcher processes. `summary.json` and `handoff.md` provide the compact Codex
+handoff. `git ls-files` plus non-ignored untracked files is the authoritative
+inventory; enumeration alone is not semantic reading.
 
 ## Codex skill
 
@@ -139,8 +145,9 @@ evidence: <ADR or explicit review reference>
 Store it under ignored `.ai/runtime/` and pass `--approval-file <path>` to prepare.
 This is an audit record bound to the contract, not identity authentication and
 not permission for merge. Existing high-risk QA, cross-family and human merge
-gates still apply. Task dependencies must already be DONE/ARCHIVED; there is no
-dependency scheduler.
+gates still apply. Durable task dependencies must already be DONE/ARCHIVED. The
+multi-agent launcher's `depends_on` graph coordinates shards inside one local
+run; it is not a scheduler for durable task contracts.
 
 ## Evidence and review
 
@@ -207,8 +214,9 @@ model to review, never merges and never declares DONE.
 - Interrupted PREPARING/LAUNCHING or stale delegation.lock: inspect run.json, Git
   worktrees/branches and processes. Retain user changes and evidence, then perform
   explicit manual recovery. Crash-safe multi-file transactions are not provided.
-- Runtime cleanup, parallel runs, automatic retries, metrics ingestion and batch
-  scheduling are deferred. No automatic worktree removal is performed.
+- Automatic worktree cleanup, crash-safe transactions, metrics ingestion and
+  unattended batch scheduling are deferred. Local multi-agent coordination is
+  bounded to two processes and one automatic retry; it is not a remote scheduler.
 
 ## Local validation
 

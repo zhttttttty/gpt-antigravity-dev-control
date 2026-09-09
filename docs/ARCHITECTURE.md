@@ -84,7 +84,8 @@ independent proof, or upgrades COMPLETE directly to DONE.
 - compact context packs with a hard size limit;
 - full local logs plus summary-first receipts;
 - fail-closed scope and evidence checks;
-- no automatic merge, retry loop, or parallel remote scheduler.
+- no automatic merge, unbounded retry loop, or parallel remote scheduler;
+- optional local multi-agent coordination capped at two processes with one retry.
 
 Local runtime records are recoverable evidence, not durable project truth. If a
 runtime record disagrees with committed task artifacts or Git history, reconcile

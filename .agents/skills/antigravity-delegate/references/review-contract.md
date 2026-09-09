@@ -16,7 +16,8 @@ Codex independently verifies every P0/P1 finding with `rg -n -C` or source reads
 
 `launch_agents.ps1` accepts a JSON object with a `tasks` array. Each task has a
 stable `name`, an absolute `worktree`, a bounded `prompt`, and optionally
-`mode` (`plan` or `accept-edits`), `auto_approve`, `effort`, `model`, and
-`attempt`. Recommended shards are `full`, `backend`, `frontend`, and `opsdocs`.
-Keep one full-coverage shard and at most one focused shard active at a time;
-the default maximum concurrency is two.
+`mode` (`plan` or `accept-edits`), `depends_on`, `max_retries`,
+`timeout_seconds`, `auto_approve`, `effort`, `model`, and `attempt`.
+Recommended shards are `full`, `backend`, `frontend`, and `opsdocs`. The
+dependency DAG, concurrency limit, and Worktree writer lock are defined in the
+[coordination protocol](coordination-protocol.md).

@@ -11,9 +11,11 @@ than a distributed automation platform.
 - Scope validation is post-execution and cannot prevent all out-of-scope access.
 - The controller does not automatically merge, independently rerun tests, or
   declare a task DONE.
-- Recovery is explicit and limited; there is no unattended retry loop.
+- Single-task recovery is explicit. The local multi-agent launcher permits only
+  one automatic retry and then stops; there is no unattended retry loop.
 - Runtime cleanup, crash-safe multi-file transactions, automatic backup, metrics
-  ingestion, batch scheduling, and parallel task dispatch are not implemented.
+  ingestion, and unattended batch scheduling are not implemented. Local parallel
+  dispatch is limited to two agents and does not coordinate remote workers.
 - Full-access mode skips agy confirmations and therefore belongs only in a
   disposable trusted worktree; it does not grant administrator rights.
 - Compact receipts report observed Git state and executor claims. Codex still

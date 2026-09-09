@@ -40,3 +40,22 @@ jobs:
           rm -rf .ai/tasks/queue/TASK-EXAMPLE
       - name: Local delegation regression tests (no provider calls)
         run: python -m unittest discover -s tests -v
+
+  windows-protocol:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell protocol scripts
+        shell: powershell
+        run: |
+          $failed = $false
+          Get-ChildItem .agents/skills/antigravity-delegate/scripts/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { $failed = $true; $errors | ForEach-Object { Write-Error $_.Message } }
+          }
+          if ($failed) { exit 1 }
+      - name: Multi-agent scheduler tests (no provider calls)
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_multi_agent_protocol.ps1

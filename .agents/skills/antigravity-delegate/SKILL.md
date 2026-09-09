@@ -1,11 +1,22 @@
 ---
 name: antigravity-delegate
-description: "Delegate bounded coding, review, testing, or repository-analysis tasks to the locally installed Antigravity CLI in an isolated Git worktree. Use when the user explicitly requests Antigravity or when Antigravity delegation is part of the requested workflow; do not use as a silent replacement for ordinary Codex subtasks."
+description: "Decide whether to delegate bounded coding, review, testing, refactoring, or repository-analysis work to the locally installed Antigravity CLI in an isolated Git worktree, then control and verify that execution. Use automatically when a multi-file task has clear scope and command-verifiable acceptance criteria; keep small or tightly interactive work in Codex, and require approval before high-risk delegation."
 ---
 
 # Antigravity delegation controller
 
 Codex owns planning, routing, scope, acceptance, and independent verification. This Skill supplies a deterministic local execution protocol; it is not a remote scheduler and it must not silently replace ordinary Codex subtasks.
+
+## Decide whether to delegate
+
+Codex may select this Skill automatically. State the routing decision before starting Antigravity.
+
+- Use `direct` for small edits, short documentation/configuration changes, ambiguous exploration, or work that needs continuous interactive reasoning.
+- Use `delegated` for bounded multi-file implementation, test completion, independent refactoring, or repository review with command-verifiable acceptance criteria.
+- Use `approval_required` before delegating architecture, authentication, security, migration, deployment, billing, destructive, or otherwise high-risk changes.
+- Keep work direct when capability probing fails or delegation setup/review overhead is likely to exceed implementation effort.
+
+Automatic Skill selection authorizes planning and read-only capability probing only. Obtain the task's required approval immediately before mutation, permission bypass, or other gated execution.
 
 ## Required protocol
 

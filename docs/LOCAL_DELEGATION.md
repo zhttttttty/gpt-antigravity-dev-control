@@ -23,9 +23,9 @@ On Windows, agy may be installed without a PATH entry:
 python .ai/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
 ```
 
-The adapter probes `--version` and `help`, storing output locally. The shipped
-print-mode argument shape was verified with agy **1.0.10** help, not assumed from
-the Antigravity desktop executable. Default execution uses `--print-timeout 20m`
+The adapter probes `--version`, `--help`, `agent`, `agents`, and `agent list`,
+storing raw output locally and deriving supported flags and modes from help. Do
+not assume a fixed agy version or a `direct` mode. Default execution uses `--print-timeout 20m`
 and `-p <prompt>` from the isolated worktree. It does not parse stdout as JSON:
 agy prints text, and the executor must write the structured receipt file.
 The model remains the CLI's configured default. No Hermes installation is needed.
@@ -67,6 +67,22 @@ arguments, `launch --args-file local-argv.json` takes a JSON string array with
 `{worktree}`, `{context}`, `{receipt}` placeholders (literal braces need doubling).
 Arguments are passed without a shell. Windows batch wrappers are rejected; use
 a native executable. Set an outer command timeout of at least 1260 seconds.
+
+### Protocol scripts for multi-agent review
+
+The Skill includes deterministic scripts for bounded review shards:
+
+```powershell
+powershell -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
+powershell -File .agents/skills/antigravity-delegate/scripts/create_review_worktree.ps1 -Name review -OutputFile .ai/runtime/review-worktree.json
+powershell -File .agents/skills/antigravity-delegate/scripts/launch_agents.ps1 -ConfigPath .ai/runtime/agents.json -OutputDir .ai/runtime/review-run -MaxConcurrency 2
+powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1 -OutputDir .ai/runtime/review-run
+powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <path-from-json>
+```
+
+The launcher caps concurrency at two and keeps `sessions.json`, reports, stderr,
+and execution logs together. `git ls-files` plus non-ignored untracked files is
+the authoritative inventory; enumeration alone is not semantic reading.
 
 ## Codex skill
 

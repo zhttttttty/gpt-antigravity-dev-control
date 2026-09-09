@@ -1,83 +1,29 @@
 ---
 name: antigravity-delegate
-description: "Run the repository's complete Codex-controlled AI development workflow: plan a task, choose direct or local Antigravity execution, prepare an isolated worktree, collect compact evidence, and review the result. Use for bounded implementation or when the user asks Codex to operate the control plane end to end."
+description: "Delegate bounded coding, review, testing, or repository-analysis tasks to the locally installed Antigravity CLI in an isolated Git worktree. Use when the user explicitly requests Antigravity or when Antigravity delegation is part of the requested workflow; do not use as a silent replacement for ordinary Codex subtasks."
 ---
 
-# Codex-controlled development
+# Antigravity delegation controller
 
-Codex owns the plan, task contract, routing decision, independent review, and
-final recommendation. Antigravity is only a local implementation subprocess
-started by Codex through the repository CLI. Do not introduce Hermes, a remote
-orchestrator, a reviewer API, a background scheduler, or automatic merge.
+Codex owns planning, routing, scope, acceptance, and independent verification. This Skill supplies a deterministic local execution protocol; it is not a remote scheduler and it must not silently replace ordinary Codex subtasks.
 
-Use the unified entry point from the target repository:
+## Required protocol
+
+1. Probe the actual executable before every run:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
+
+   Read `capabilities.json`. Do not assume a flag, mode, login state, or agent-list command. The controller routes `direct`, `delegated`, and `approval_required` are not `agy --mode` values. Map full access to omitted `--sandbox`, automatic approval to `--dangerously-skip-permissions`, read-only review to `--mode plan`, and implementation to an advertised edit mode. Full access never expands the task contract.
+2. Create isolation with `create_review_worktree.ps1`. Read its JSON path and branch instead of guessing temporary paths. Refuse a dirty base unless the task explicitly allows it.
+3. For one task, use the repository control CLI. For several bounded review shards, create a JSON config and call `launch_agents.ps1` with `-MaxConcurrency 2`. Use one full-coverage shard plus one focused shard, then queue the remaining shards. Retry at most once and lower concurrency to one after a concurrent failure.
+4. Use a fixed output directory. The launcher writes `sessions.json`, one report per agent, stderr, execution logs, and the capability record. Call `collect_reports.ps1` and read its compact summary before opening full evidence.
+5. Apply the independent Codex review contract: verify all P0/P1 paths and lines, run tests, check acceptance and coverage counts, classify findings as confirmed/conditional/hypothesis, and verify the worktree state. Collection is never an automatic merge or DONE transition.
+6. Clean only through `cleanup_worktree.ps1`; removal is allowed only when the worktree is clean unless an explicit forced cleanup is approved.
+
+## Repository entry point
+
+For normal task lifecycle operations, use:
 
     python .ai/scripts/control.py <command>
 
-The older ai.py and delegate.py files are compatibility modules behind this
-entry point. Read [the Codex workflow reference](references/codex-workflow.md)
-for the full lifecycle and [the task protocol reference](references/task-protocol.md)
-when creating or editing a contract.
-
-## Select an execution mode
-
-- direct: small edits, documentation, configuration, or work where delegation
-  overhead is larger than implementation effort.
-- delegated: bounded multi-file implementation, tests, or refactors that can
-  be checked in an isolated worktree.
-- approval_required: architecture, authentication, security, migrations,
-  deployment, billing, destructive operations, or any task whose risk/authority
-  fields require human approval.
-
-Missing execution defaults to direct. Never upgrade a task's authority or expand
-its writable scope to make delegation easier.
-
-## Codex-only operating procedure
-
-1. Read the repository instructions and inspect the task/project artifacts.
-2. Create or update a bounded task contract, acceptance checks, and execution
-   mode. Validate and route it:
-
-       python .ai/scripts/control.py validate TASK-ID
-       python .ai/scripts/control.py route TASK-ID
-
-3. For direct work, use the control-plane state/worktree commands and implement
-   within the contract.
-4. For delegated work, obtain confirmation immediately before mutation, then:
-
-       python .ai/scripts/control.py prepare TASK-ID --approve
-       python .ai/scripts/control.py launch TASK-ID --approve --interactive --executable PATH
-
-   Run the command from a real Codex terminal/PTY so scoped prompts, terms,
-   privacy choices, and folder trust remain visible. Do not redirect the
-   interactive terminal. Probe/help success proves discovery only, not login.
-5. After the executor writes its receipt, collect the compact result:
-
-       python .ai/scripts/control.py status TASK-ID
-       python .ai/scripts/control.py collect TASK-ID
-
-   Read the summary first. Inspect full logs only when the summary or review
-   identifies a specific question.
-6. Codex independently checks the exact diff, receipt, required commands, and
-   acceptance evidence. Collection leads to REVIEW, never directly to DONE.
-   Write QA/review artifacts, apply the state transition, and leave merge as an
-   explicit human action.
-
-## Recovery and full access
-
-If a launch exits without a valid receipt, treat it as NEEDS_ATTENTION:
-
-    python .ai/scripts/control.py diagnose TASK-ID
-
-Inspect the run and worktree before one explicitly confirmed interactive
-recovery. Do not loop retries or infer success from exit code 0.
-
-For a disposable trusted worktree only, --full-access --approve may be added to
-the interactive launch. It forwards agy's permission-bypass flag; it does not
-grant administrator rights, constrain filesystem access, or remove scope,
-receipt, review, or merge gates. Never enable it silently.
-
-Use [the receipt protocol reference](references/receipt-protocol.md) for missing
-evidence, scope failures, REWORK, BLOCKED tasks, and review handoff. Keep all
-runtime logs, context packs, and credentials local; never put secrets in task
-contracts or receipts.
+Read [execution modes](references/execution-modes.md), [review contract](references/review-contract.md), and [failure recovery](references/failure-recovery.md). The existing [task protocol](references/task-protocol.md), [receipt protocol](references/receipt-protocol.md), and [Codex workflow](references/codex-workflow.md) define the repository state machine and compact receipt format.

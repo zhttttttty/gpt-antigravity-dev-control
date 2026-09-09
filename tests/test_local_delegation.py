@@ -291,6 +291,7 @@ class LocalDelegationTests(unittest.TestCase):
              patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
              patch('antigravity_cli.subprocess.run') as run:
             run.return_value.returncode = 0
+            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n'
             result = adapter.launch(self.root, logs / "context.md", receipt, logs)
         argv = run.call_args.args[0]
         self.assertIn('-i', argv)
@@ -308,6 +309,7 @@ class LocalDelegationTests(unittest.TestCase):
              patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
              patch('antigravity_cli.subprocess.run') as run:
             run.return_value.returncode = 0
+            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n'
             adapter.launch(self.root, logs / "context.md", receipt, logs)
         argv = run.call_args.args[0]
         self.assertIn('--dangerously-skip-permissions', argv)

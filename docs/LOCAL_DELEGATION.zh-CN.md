@@ -15,8 +15,9 @@ Windows 上 agy 不在 PATH 时：
 
     python .ai/scripts/control.py probe --executable C:\path\to\agy.exe
 
-探测只检查版本和帮助信息。真实登录、条款、隐私选项和文件夹信任需要在交互终端
-中完成。
+探测会检查 `--version`、`--help`、`agent`、`agents` 和 `agent list`，并从帮助文本
+动态解析实际参数与模式。不要假设固定版本，也不要把控制器的 `direct` 当成 agy
+模式。真实登录、条款、隐私选项和文件夹信任需要在交互终端中完成。
 
 ## 交互执行
 
@@ -33,6 +34,19 @@ Windows 上 agy 不在 PATH 时：
 
 该选项只向 agy 传递 permission-bypass 参数，不授予管理员权限，也不会移除 Scope、
 Receipt、Review 或人工合并门。永远不要静默启用。
+
+## 多代理审阅协议脚本
+
+需要多个边界清晰的审阅分片时，使用 Skill 自带的确定性脚本：
+
+    powershell -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
+    powershell -File .agents/skills/antigravity-delegate/scripts/create_review_worktree.ps1 -Name review -OutputFile .ai/runtime/review-worktree.json
+    powershell -File .agents/skills/antigravity-delegate/scripts/launch_agents.ps1 -ConfigPath .ai/runtime/agents.json -OutputDir .ai/runtime/review-run -MaxConcurrency 2
+    powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1 -OutputDir .ai/runtime/review-run
+    powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <JSON 中的 path>
+
+默认最多并发两个代理；`sessions.json`、报告、stderr 和执行日志固定保存在同一目录。
+覆盖统计以 `git ls-files` 加未忽略未跟踪文件为权威清单；枚举文件不等于完成语义阅读。
 
 ## 单任务流程
 

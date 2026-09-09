@@ -1,0 +1,6 @@
+interface:
+  display_name: "Antigravity Delegate"
+  short_description: "Codex-controlled local agy delegation"
+  default_prompt: "Use $antigravity-delegate to plan, run, and independently review a bounded local Antigravity task."
+policy:
+  allow_implicit_invocation: true

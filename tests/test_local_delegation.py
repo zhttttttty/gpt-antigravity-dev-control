@@ -300,6 +300,28 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertNotIn('stdout', run.call_args.kwargs)
         self.assertEqual(result['diagnostic'], 'RECEIPT_PRESENT_UNVERIFIED')
 
+    def test_full_access_is_explicit_and_only_changes_argv(self):
+        logs = self.root / ".ai/runtime/full-access"; logs.mkdir(parents=True)
+        receipt = logs / "receipt.yaml"; receipt.write_text('status: COMPLETE\n')
+        adapter = AntigravityCLI(sys.executable, interactive=True, full_access=True)
+        with patch('antigravity_cli.sys.stdin.isatty', return_value=True), \
+             patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
+             patch('antigravity_cli.subprocess.run') as run:
+            run.return_value.returncode = 0
+            adapter.launch(self.root, logs / "context.md", receipt, logs)
+        argv = run.call_args.args[0]
+        self.assertIn('--dangerously-skip-permissions', argv)
+        self.assertIn('--add-dir', argv)
+        self.assertNotIn('--sandbox', argv)
+
+    def test_full_access_requires_approval_at_cli_boundary(self):
+        self.prepare()
+        cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+                             '--repo', str(self.root), 'launch', 'TASK-TEST', '--full-access'],
+                            capture_output=True, text=True)
+        self.assertEqual(cp.returncode, 2)
+        self.assertIn('requires explicit --approve', cp.stderr)
+
     def test_one_interactive_recovery_preserves_logs(self):
         self.prepare()
         d.launch(self.root, 'TASK-TEST', AntigravityCLI(sys.executable, ['-c', "print('first')"], 5), True)

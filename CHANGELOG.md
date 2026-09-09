@@ -5,6 +5,8 @@
 - Detect permission-denied/no-receipt exits as NEEDS_ATTENTION, expose sanitized
   diagnostic categories, and strengthen worktree-only executor prompts.
 - Document the assisted real-task validation and its unresolved unattended limits.
+- Add explicit opt-in `--full-access --approve` forwarding for trusted disposable
+  worktrees; default interactive permissions remain unchanged.
 
 - Add local routing, confirmed worktree preparation, agy print-mode adapter,
   compact receipt collection and preserved local evidence.

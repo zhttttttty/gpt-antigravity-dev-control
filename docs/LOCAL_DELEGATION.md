@@ -43,6 +43,19 @@ Interactive output includes the TUI followed by the final controller JSON; it
 is not a JSON-only stream. `launch.log` notes that terminal output is not captured;
 `agy.log` contains CLI diagnostics and can include private data, so keep it local.
 
+### Optional full-access mode
+
+For a disposable, explicitly trusted worktree:
+
+```sh
+python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --full-access --executable /absolute/path/to/agy
+```
+
+This requires `--approve`; it is never the default. It only skips agy tool
+confirmations. It does not grant Windows administrator rights, constrain
+filesystem access, or remove receipt, scope and review gates. Use it only when
+the worktree and task context contain no secrets.
+
 Help/version success does **not** prove authentication or tool permissions.
 Authenticate interactively when prompted. The controller does not add
 `--dangerously-skip-permissions`. A noninteractive permission prompt may require

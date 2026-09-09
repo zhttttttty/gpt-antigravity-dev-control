@@ -28,6 +28,10 @@ permission denial now becomes `NEEDS_ATTENTION`; use `diagnose` and at most one
 confirmed interactive `--recover`, not automatic retries. Unattended operation
 has not been validated.
 
+For a disposable trusted worktree, `launch --interactive --full-access --approve`
+passes agy's `--dangerously-skip-permissions`; it is opt-in and does not grant
+Windows administrator rights. Receipt, scope and review gates still apply.
+
 ![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 
 ## Why

@@ -8,11 +8,12 @@ import yaml
 
 
 class AntigravityCLI:
-    def __init__(self, executable="agy", args=None, timeout=1260, interactive=False):
+    def __init__(self, executable="agy", args=None, timeout=1260, interactive=False, full_access=False):
         self.executable = executable
         self.args = args
         self.timeout = timeout
         self.interactive = interactive
+        self.full_access = full_access
 
     def validate_launch(self):
         self.resolve()
@@ -35,6 +36,7 @@ class AntigravityCLI:
             "If a permission is denied, report the blocker; do not search alternative directories.")
         args = self.args if self.args is not None else [
             "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
+            *(["--dangerously-skip-permissions"] if self.full_access else []),
             *(["-i", prompt] if self.interactive else ["--print-timeout", "20m", "-p", prompt])]
         if not isinstance(args, list) or not args or not all(isinstance(x, str) for x in args):
             raise ValueError("Configure a non-empty argv JSON list after inspecting CLI help")

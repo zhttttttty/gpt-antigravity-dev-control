@@ -18,6 +18,11 @@ python .ai/scripts/delegate.py --help
 返回 `NEEDS_ATTENTION`；可用 `diagnose` 排查，并显式执行一次交互 `--recover`。
 这不代表无人值守已验证，也不启用全局免确认。
 
+如确需在一次性可信 Worktree 中免逐项确认，可显式使用
+`launch --interactive --full-access --approve`。它只传递 agy 的
+`--dangerously-skip-permissions`，不授予 Windows 管理员权限；回执、范围和
+Review 门仍然有效，且不会成为默认模式。
+
 - [V3.1 操作与恢复指南](docs/LOCAL_DELEGATION.md)
 - [用量测量方法](COST_METRICS.md)：不保证固定 Token 节省比例。
 

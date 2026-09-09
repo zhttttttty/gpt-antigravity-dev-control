@@ -353,6 +353,7 @@ def main():
             p.add_argument("--timeout", type=int, default=1260)
             p.add_argument("--interactive", action="store_true", help="Inherit a real terminal for scoped approvals (recommended)")
             p.add_argument("--recover", action="store_true", help="One explicitly confirmed interactive recovery after a stopped launch")
+            p.add_argument("--full-access", action="store_true", help="Pass agy --dangerously-skip-permissions; requires --approve")
     args = parser.parse_args()
     try:
         root = Path(git(args.repo.resolve(), "rev-parse", "--show-toplevel")).resolve()
@@ -368,8 +369,10 @@ def main():
             elif args.command == "prepare":
                 result = prepare(root, args.task_id, args.approve, args.approval_file)
             elif args.command == "launch":
+                if args.full_access and not args.approve:
+                    raise ValueError("--full-access requires explicit --approve")
                 argv = json.loads(args.args_file.read_text(encoding="utf-8")) if args.args_file else None
-                result = launch(root, args.task_id, AntigravityCLI(args.executable, argv, args.timeout, args.interactive), args.approve, args.recover)
+                result = launch(root, args.task_id, AntigravityCLI(args.executable, argv, args.timeout, args.interactive, args.full_access), args.approve, args.recover)
             elif args.command == "collect":
                 result = collect(root, args.task_id)
             elif args.command == "diagnose":

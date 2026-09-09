@@ -31,6 +31,10 @@ Use the repository CLI, not a second orchestrator or remote reviewer API:
    Run `diagnose TASK-ID`. Once the process has stopped, one explicit
    `launch TASK-ID --approve --interactive --recover --executable <path>` is
    permitted; it preserves the first launch's logs. Do not loop retries.
+   For a deliberately trusted disposable worktree, add `--full-access` together
+   with `--approve`. This forwards agy's `--dangerously-skip-permissions`; it is
+   opt-in, recorded, and still subject to receipt, scope and review checks. It
+   does not grant Windows administrator rights or sandbox other directories.
 5. Run `collect TASK-ID`. Read the compact receipt first. Follow
    [receipt protocol](references/receipt-protocol.md) for missing evidence,
    targeted diffs, review and rework. Do not read full logs by default.

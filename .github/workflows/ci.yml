@@ -19,7 +19,6 @@ jobs:
         run: |
           python -m compileall .ai/scripts
           python -m compileall .ai/adapters .agents/skills
-          if [ -d .ai/orchestrator ]; then python -m compileall .ai/orchestrator; fi
       - name: Parse YAML
         run: |
           python - <<'PY'
@@ -33,7 +32,6 @@ jobs:
         run: |
           python .ai/scripts/ai.py status
           python .ai/scripts/delegate.py --help
-          if [ -f .ai/orchestrator/orchestrator.py ]; then python .ai/orchestrator/orchestrator.py --help; fi
       - name: Validate example task against V2 contract
         run: |
           mkdir -p .ai/tasks/queue

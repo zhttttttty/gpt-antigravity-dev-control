@@ -1,4 +1,18 @@
-# 3.1.0-local
+# Changelog
+
+All notable changes are documented here.
+
+## [3.1.1-local] - 2026-09-09
+
+- Preserve the former V3 Lite implementation on `archive/v3-lite` and remove its
+  remote API adapters, SQLite coordination layer, CLI, configuration, and CI
+  hooks from `main`.
+- Make V3.1 local delegation the sole primary path on `main`; keep V2-compatible
+  manual commands and all task/risk/receipt/worktree protocol guarantees.
+- Update documentation, security guidance, contribution checks, and issue/PR
+  templates for the local-only architecture.
+
+## [3.1.0-local] - 2026-09-09
 
 - Add terminal-inheriting interactive launch and one confirmed recovery with
   separate logs; reject redirected interactive sessions before changing state.
@@ -11,12 +25,9 @@
 - Add local routing, confirmed worktree preparation, agy print-mode adapter,
   compact receipt collection and preserved local evidence.
 - Add repo-scoped Codex delegation skill and measured-cost guidance.
-- Preserve V2 state/review gates and experimental V3 Lite remote code.
+- Preserve V2 state/review gates; the V3 Lite remote code was still present in
+  this release and is now retained in Git history and `archive/v3-lite`.
 - Add offline Git/process integration tests; no automatic merge or retry loop.
-
-# Changelog
-
-All notable changes are documented here.
 
 ## [3.0.0-lite] - 2026-08-30
 

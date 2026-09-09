@@ -8,13 +8,19 @@ For a suspected vulnerability, open a minimal GitHub issue without sensitive exp
 
 ## Secret handling
 
-V3 Lite expects secrets through environment variables such as:
+V3.1 delegates through the user's local agy installation. Keep authentication in
+the CLI's supported credential store; do not copy tokens, account data, or private
+repository credentials into task contracts, context packs, receipts, or commits.
 
-- `OPENAI_API_KEY`
-- `GEMINI_API_KEY`
-- `ANTIGRAVITY_GITHUB_PAT`
+`.env*`, `.ai/runtime/`, and local execution logs are ignored by default. Logs may
+still contain source snippets, paths, prompts, or provider diagnostics; sanitize
+them before attaching them to an issue.
 
-Never commit these values. Runtime SQLite files and `.env*` are ignored by default.
+## Full-access execution
+
+`--full-access` is an explicit launch option for a disposable trusted worktree.
+It forwards agy's permission-bypass flag but does not grant administrator rights
+or create an OS sandbox. Review the task scope and worktree contents before use.
 
 ## High-risk changes
 

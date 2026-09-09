@@ -7,15 +7,17 @@ Contributions are welcome.
 - Keep V2 protocol semantics backward-compatible unless a versioned migration is provided.
 - Keep the executor bounded by `task.yaml` authority.
 - Prefer repository evidence over model claims.
-- Keep V3 Lite lightweight; avoid infrastructure dependencies without a clear need.
+- Keep V3.1 local-first and summary-first; do not add remote scheduling or reviewer
+  services to `main`.
 
 ## Development
 
 ```bash
-python -m pip install -r .ai/orchestrator/requirements.txt
-python -m compileall .ai/scripts .ai/orchestrator
+python -m pip install -r .ai/scripts/requirements-local.txt
+python -m compileall .ai/scripts .ai/adapters .agents/skills
 python .ai/scripts/ai.py status
-python .ai/orchestrator/orchestrator.py --help
+python .ai/scripts/delegate.py --help
+python -m unittest discover -s tests -v
 ```
 
 Before changing task schema, Risk Gates, Receipt formats or state transitions, update documentation and `CHANGELOG.md`.

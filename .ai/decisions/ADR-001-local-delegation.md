@@ -3,8 +3,10 @@
 Status: accepted for implementation by the project owner's V3.1 request.
 
 Keep the V2 contract, state machine, receipts and merge gates. Add a separate
-Python CLI using local Git worktrees and a replaceable executor adapter. Leave
-the V3 Lite remote orchestrator unchanged and explicitly experimental.
+Python CLI using local Git worktrees and a replaceable executor adapter. The
+former V3 Lite remote implementation is preserved on `archive/v3-lite` and
+removed from `main` because this project does not require remote concurrent
+scheduling.
 
 The planner selects direct, delegated or approval-required execution. Every
 local launch requires confirmation. CLI discovery does not prove login or

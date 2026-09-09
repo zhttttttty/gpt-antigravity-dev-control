@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible defect in the protocol, CLI, or orchestrator
+description: Report a reproducible defect in the protocol or local delegation CLI
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: Version / branch
-      placeholder: "main 3.0.0-lite or v2"
+      placeholder: "main 3.1.1-local or v2"
     validations:
       required: true
   - type: textarea

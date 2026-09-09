@@ -9,8 +9,8 @@
 ## Layer
 
 - [ ] V2 protocol
-- [ ] V3 Lite orchestrator
-- [ ] Provider adapter
+- [ ] V3.1 local delegation
+- [ ] Local executor adapter
 - [ ] Documentation / examples
 
 ## Compatibility / risk

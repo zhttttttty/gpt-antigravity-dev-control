@@ -1,58 +1,58 @@
 # Architecture
 
-## Preferred V3.1 local path
+## V3.1 local-first path
 
 Codex skill → `.ai/scripts/delegate.py` → executor interface / local agy →
 isolated Git worktree → compact receipt → independent Codex review → human merge.
-The controller uses the existing V2 state machine, with no remote reviewer call.
-Runtime logs are local evidence, not a second authoritative task queue.
-See [ADR-001](../.ai/decisions/ADR-001-local-delegation.md) and
-[local operations](LOCAL_DELEGATION.md). The older automation layer below remains optional.
-
-## Layers
+The controller reuses the V2 state machine and does not call a remote reviewer,
+run a background scheduler, or maintain a second task database.
 
 ```mermaid
 flowchart TB
-  U[Human] --> P[Planning / Architecture Layer\nGPT-5.6 Sol]
-  P --> C[V2 Protocol Layer\n.ai/ + task.yaml]
-  C --> O[V3 Lite Automation Layer\nOrchestrator + SQLite]
-  O --> W[Execution Layer\nAntigravity / Gemini]
-  W --> G[Git Worktree + Tests + Receipts]
-  G --> R[Independent Review Layer\nGPT-5.6 Sol]
+  U[Human] --> P[Planning / Architecture\nCodex]
+  P --> C[Protocol Layer\n.ai/ + task.yaml]
+  C --> D[Local Delegation Controller]
+  D --> W[Isolated Git Worktree]
+  W --> E[Antigravity / Gemini]
+  E --> G[Commit + Receipt + Local Logs]
+  G --> R[Independent Review\nCodex]
   R --> C
+  R --> M[Human Merge Gate]
 ```
 
-## V2 Protocol Layer
-
-Durable, repository-native artifacts:
+## Durable protocol layer
 
 - project requirements and architecture;
-- structured task contract;
-- task state folders;
-- Risk Gates;
-- Executor/QA Receipts;
-- ADRs;
-- Git history and worktrees.
+- structured task contracts and folder-backed states;
+- Risk Gates and Executor/QA Receipts;
+- ADRs, Git history, commits, and worktrees;
+- attempt history for REWORK.
 
-This is the compatibility boundary. An alternative Orchestrator can be written without redefining the task protocol.
+This is the compatibility boundary. Executor adapters can change without
+redefining task semantics.
 
-## V3 Lite Automation Layer
+## Local delegation layer
 
-V3 Lite adds coordination only:
+- explicit route, prepare, launch, status, diagnose, recover, and collect steps;
+- one isolated worktree and branch per attempt;
+- compact context packs with a hard size limit;
+- full local logs plus summary-first receipts;
+- fail-closed scope and evidence checks;
+- no automatic merge, retry loop, or parallel remote scheduler.
 
-- SQLite runtime table;
-- dispatch state;
-- attempt tracking;
-- lease/worker metadata;
-- provider IDs;
-- automated review loop.
-
-SQLite is not the source of project truth. If runtime state and repository artifacts disagree, reconcile toward the repository artifacts.
+Local runtime records are recoverable evidence, not durable project truth. If a
+runtime record disagrees with committed task artifacts or Git history, reconcile
+toward the repository artifacts after inspection.
 
 ## Authority boundaries
 
-GPT-5.6 Sol owns architecture, planning and independent acceptance. Antigravity owns bounded implementation and evidence generation. Human authority remains mandatory for architecture/high-risk approval where configured.
+Codex owns architecture, planning, and independent acceptance. Antigravity owns
+bounded implementation and evidence generation. Humans retain high-risk approval
+and final integration authority.
 
 ## Failure model
 
-The system is designed to fail closed: missing evidence becomes `UNKNOWN`, `NOT_RUN` or `BLOCKED`, not an inferred PASS.
+Missing or ambiguous evidence becomes `UNKNOWN`, `NOT_RUN`, `NEEDS_ATTENTION`,
+or `BLOCKED`, never an inferred PASS. See
+[local operations](LOCAL_DELEGATION.md) and
+[ADR-001](../.ai/decisions/ADR-001-local-delegation.md).

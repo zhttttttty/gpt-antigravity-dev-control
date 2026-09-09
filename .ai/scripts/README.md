@@ -11,6 +11,7 @@ python .ai/scripts/ai.py transition TASK-001 DONE
 python .ai/scripts/ai.py worktree-remove TASK-001
 ```
 
-`task.yaml` remains the contract. This helper validates only the stable V2 schema fields used by the template; it is not a general YAML engine or full orchestrator.
+`task.yaml` remains the contract. This helper validates only the stable V2 schema fields used by the template; it is not a general YAML engine or scheduler.
 
-For production orchestration, keep the artifact schema but move concurrency, leases, retries and centralized runtime state into a transactional store such as SQLite.
+V3.1 local delegation is provided by `delegate.py`. It intentionally keeps
+execution explicit and local, with no background concurrency service.

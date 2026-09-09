@@ -1,24 +1,23 @@
-# V3.1 local limitations
+# Current limitations
 
-The local path is implemented separately; see [its recovery and limitation
-details](LOCAL_DELEGATION.md). It needs actual agy login/tool permissions and does
-not automate merge, independent verification, retries, runtime backup or crash
-recovery. Compact receipts distinguish observed Git state from executor-reported
-tests. The original V2/V3 Lite limitations below remain relevant to those paths.
+V3.1 is intentionally a local, human-supervised delegation controller rather
+than a distributed automation platform.
 
-# Current Limitations
+- A working local agy installation, login, and tool permissions are required.
+- Probe/help success does not prove authentication or successful model execution.
+- Worktrees isolate Git state but are not an operating-system security sandbox.
+- Scope validation is post-execution and cannot prevent all out-of-scope access.
+- The controller does not automatically merge, independently rerun tests, or
+  declare a task DONE.
+- Recovery is explicit and limited; there is no unattended retry loop.
+- Runtime cleanup, crash-safe multi-file transactions, automatic backup, metrics
+  ingestion, batch scheduling, and parallel task dispatch are not implemented.
+- Full-access mode skips agy confirmations and therefore belongs only in a
+  disposable trusted worktree; it does not grant administrator rights.
+- Compact receipts report observed Git state and executor claims. Codex still
+  needs to inspect the relevant diff and independently verify acceptance.
+- No fixed token, time, or cost reduction is guaranteed. Measure real tasks.
 
-V3 Lite is intentionally a lightweight reference implementation, not a production distributed scheduler.
-
-## Current boundaries
-
-- Provider adapters depend on external API contracts and model/agent identifiers that can change. Keep `.ai/orchestrator/config.yaml` configurable and verify provider compatibility before real use.
-- SQLite is local coordination state. It is not designed for multi-host distributed locking.
-- `max_workers` exists as configuration, but the current implementation dispatches tasks sequentially from one process; true concurrent worker scheduling is future work.
-- The repository protocol is more mature than the automation layer. Git, task contracts and receipts remain the recovery source if Orchestrator runtime state is lost.
-- Real provider calls require your own API keys and may incur usage costs.
-- High-risk work should remain human-supervised even when automation is enabled.
-
-## Non-goals for V3 Lite
-
-Redis, RabbitMQ, Kubernetes, a web dashboard, multi-machine workers and enterprise RBAC are deliberately excluded until real usage demonstrates a need.
+Detailed operational failure handling is in [Local Delegation](LOCAL_DELEGATION.md).
+The removed V3 Lite implementation remains available only on
+[`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite).

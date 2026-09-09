@@ -2,8 +2,8 @@
 
 **Codex plans and reviews; Antigravity implements; a human approves merge.**
 No remote reviewer API, automatic merge, background scheduler or automatic retry
-is required. V2 is unchanged; V3 Lite remains an optional experimental provider
-path in `.ai/orchestrator/`.
+is required. V2 remains the protocol baseline. The removed V3 Lite code is
+preserved only on `archive/v3-lite`.
 
 ## Setup
 
@@ -57,9 +57,10 @@ filesystem access, or remove receipt, scope and review gates. Use it only when
 the worktree and task context contain no secrets.
 
 Help/version success does **not** prove authentication or tool permissions.
-Authenticate interactively when prompted. The controller does not add
-`--dangerously-skip-permissions`. A noninteractive permission prompt may require
-manual intervention; never interpret it as success. For version-specific
+Authenticate interactively when prompted. The controller adds
+`--dangerously-skip-permissions` only when explicit `--full-access --approve` is
+used. A noninteractive permission prompt may require manual intervention; never
+interpret it as success. For version-specific
 arguments, `launch --args-file local-argv.json` takes a JSON string array with
 `{worktree}`, `{context}`, `{receipt}` placeholders (literal braces need doubling).
 Arguments are passed without a shell. Windows batch wrappers are rejected; use

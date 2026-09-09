@@ -2,32 +2,44 @@
 
 [中文说明](README.zh-CN.md)
 
-Repository-native AI development control plane for pairing **Codex** as planner
-and reviewer with **Antigravity / Gemini** as a bounded local implementation
-executor.
+A local-first AI development control plane: **Codex plans and reviews;
+Antigravity / Gemini implements bounded tasks in Git worktrees; humans approve
+high-risk work and merge**.
 
-## V3.1: local-first delegation
+There is one protocol and one primary CLI. Per-task `execution.mode` selects
+direct implementation, local delegation, or approval-required delegation.
 
-Codex plans and accepts; local `agy` implements in an isolated Git worktree.
-Compact receipts return first while full logs remain local. No remote reviewer
-API, automatic merge, background scheduler, or remote concurrency service is
-required.
+## Quick start
 
 ```sh
 python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/delegate.py probe
-python .ai/scripts/delegate.py --help
+python .ai/scripts/control.py status
+python .ai/scripts/control.py probe
+python .ai/scripts/control.py --help
 ```
 
-Use the repo-scoped `$antigravity-delegate` skill and follow the
-[V3.1 guide](docs/LOCAL_DELEGATION.md). Small changes can stay direct; bounded
-multi-file implementation and tests are suitable for delegation.
+Create a task from `.ai/templates/task/`, then choose its route:
 
-For a disposable trusted worktree,
-`launch --interactive --full-access --approve` passes agy's
-`--dangerously-skip-permissions`. It is explicit, never the default, and does
-not grant Windows administrator rights. Receipt, scope, review, and merge gates
-remain active.
+```yaml
+execution:
+  mode: delegated  # direct | delegated | approval_required
+  adapter: antigravity_cli
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 2
+  escalation: codex_review
+```
+
+```sh
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive
+python .ai/scripts/control.py collect TASK-001
+```
+
+The older `ai.py` and `delegate.py` commands remain compatibility entry points;
+new usage should use `control.py`.
 
 ![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
 
@@ -35,63 +47,74 @@ remain active.
 
 ```mermaid
 flowchart TD
-    H[Human intent] --> G[Codex\nPlan / Architecture]
-    G --> T[task.yaml contract]
-    T --> O[V3.1 Local CLI + Worktree]
-    O --> A[Antigravity / Gemini\nImplement + Test]
-    A --> E[Compact Receipt + Local Evidence]
-    E --> R[Codex\nIndependent Review]
-    R -->|PASS| M[Human Merge]
-    R -->|REWORK| T
-    R -->|HIGH risk| X[Human Approval Gate]
-    X --> M
+    H[Human intent] --> C[Codex\nPlan / Architecture]
+    C --> T[Core Protocol\ntask.yaml + Risk Gates]
+    T --> R{execution.mode}
+    R -->|direct| D[Direct implementation]
+    R -->|delegated| A[Local agy + Git Worktree]
+    R -->|approval_required| X[Human Approval]
+    X --> A
+    D --> E[Receipt + Evidence]
+    A --> E
+    E --> V[Codex Independent Review]
+    V -->|REWORK| T
+    V -->|PASS| M[Human Merge]
 ```
 
-## Operating modes
+## Execution modes
 
-| Mode | Branch | Best for | Flow |
-|---|---|---|---|
-| V3.1 Local | `main` | local-first bounded implementation with explicit confirmation | Codex → local agy/worktree → compact receipt → Codex |
-| V2 Manual | `v2` | minimal moving parts and fully manual dispatch | Codex → task → Antigravity → review |
+| Mode | Use when | Execution |
+|---|---|---|
+| `direct` | Small code/config/documentation changes | Codex or a human implements under the same task contract |
+| `delegated` | Bounded multi-file implementation, tests, or refactors | Local agy implements in an isolated worktree |
+| `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then local delegation |
 
-The former V3 Lite remote/API implementation is preserved on
-[`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite)
-and intentionally absent from `main`.
+All modes share the same state machine, receipts, evidence rules, review gate,
+and human merge authority. See [Execution Modes](docs/EXECUTION_MODES.md).
 
-## Manual V2-compatible commands
+## Full-access launch
 
-```bash
-python .ai/scripts/ai.py status
-python .ai/scripts/ai.py validate TASK-001
-python .ai/scripts/ai.py start TASK-001 --worktree
+For a disposable trusted worktree only:
+
+```sh
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access
 ```
+
+This explicitly passes agy's `--dangerously-skip-permissions`; it does not grant
+administrator rights or disable scope, receipt, review, and merge gates.
 
 ## Core guarantees
 
-- `.ai/` and Git are the durable project control plane.
-- `task.yaml` defines scope, authority, risk, and acceptance criteria.
+- `.ai/` and Git are durable project truth.
+- `task.yaml` defines scope, authority, risk, routing, and acceptance criteria.
 - Executor `COMPLETE` is not reviewer `PASS`.
-- Medium/high-risk implementation uses isolated Git worktrees.
-- High-risk work cannot reach DONE without required gates and human approval.
-- REWORK preserves prior attempt evidence under `history/attempt-N/`.
-- Local runtime logs are evidence, not an authoritative second task queue.
+- Delegated and medium/high-risk implementation uses isolated Git worktrees.
+- Missing evidence fails closed; REWORK preserves earlier attempt evidence.
+- Full logs remain local and compact receipts are reviewed first.
+- The controller never automatically merges or declares a task DONE.
 
 ## Documentation
 
 - [Quick Start](docs/QUICK_START.md)
-- [V3.1 Local Delegation](docs/LOCAL_DELEGATION.md)
+- [Control Workflow](docs/CONTROL_WORKFLOW.md)
+- [Execution Modes](docs/EXECUTION_MODES.md)
+- [Local Delegation Operations](docs/LOCAL_DELEGATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [V2 vs V3.1](docs/V2_V3_1_COMPARISON.md)
-- [Current limitations](docs/LIMITATIONS.md)
-- [Cost measurement](COST_METRICS.md)
+- [Current Limitations](docs/LIMITATIONS.md)
+- [Cost Measurement](COST_METRICS.md)
 - [Risk Gates](.ai/rules/RISK_GATES.md)
-- [Example task](examples/minimal-task/README.md)
+
+## Historical branches
+
+- `v2`: manual-protocol historical baseline.
+- [`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite): removed remote API/SQLite scheduler experiment.
+
+Neither is a separate operating mode on `main`.
 
 ## Status
 
-Current line: **V3.1 / 3.1.1-local**. V3.1 local delegation is the sole primary
-path on `main`; V3 Lite is archive-only. No fixed token-savings percentage is
-promised—measure actual task time, retries, and model usage.
+Current version: **3.1.2-local**. The primary product is the unified local control
+workflow; no remote scheduler, reviewer API, or fixed token-savings claim.
 
 ## License
 

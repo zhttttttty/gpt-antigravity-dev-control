@@ -1,17 +1,21 @@
-# Helper CLI
+# Unified Control CLI
 
-Pure-Python helper; no third-party package is required.
+Use one primary entry point:
 
-```bash
-python .ai/scripts/ai.py status
-python .ai/scripts/ai.py validate TASK-001
-python .ai/scripts/ai.py start TASK-001 --worktree
-python .ai/scripts/ai.py transition TASK-001 REVIEW
-python .ai/scripts/ai.py transition TASK-001 DONE
-python .ai/scripts/ai.py worktree-remove TASK-001
+```sh
+python .ai/scripts/control.py status
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive
+python .ai/scripts/control.py collect TASK-001
+python .ai/scripts/control.py transition TASK-001 DONE
 ```
 
-`task.yaml` remains the contract. This helper validates only the stable V2 schema fields used by the template; it is not a general YAML engine or scheduler.
+`control.py` routes Core Protocol operations to `ai.py` and local delegation
+operations to `delegate.py`. Those two files remain stable compatibility entry
+points and internal modules; callers no longer need to choose between them.
 
-V3.1 local delegation is provided by `delegate.py`. It intentionally keeps
-execution explicit and local, with no background concurrency service.
+`task.yaml` is the common contract. Its `execution.mode` selects `direct`,
+`delegated`, or `approval_required`. Scheduling is explicit and local—there is
+no background concurrency service, reviewer API, automatic retry, or auto-merge.

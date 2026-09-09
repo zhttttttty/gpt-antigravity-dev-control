@@ -29,7 +29,7 @@ Rules:
 
 ## Branch-Local State Note
 
-With the lightweight helper, an active task's folder/status transition occurs inside the task worktree/branch. The base branch therefore retains the last integrated task state until that task branch is accepted and integrated. This is intentional for the lightweight V2 template.
+With the lightweight helper, an active task's folder/status transition occurs inside the task worktree/branch. The base branch therefore retains the last integrated task state until that task branch is accepted and integrated. This is intentional for direct/manual execution.
 
-V3.1 keeps scheduling explicit and local. Do not run two controllers against the
+The control plane keeps scheduling explicit and local. Do not run two controllers against the
 same task/worktree; inspect and resolve any stale local run record before retrying.

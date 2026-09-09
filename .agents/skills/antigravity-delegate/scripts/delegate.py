@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--repo", type=Path, default=Path.cwd())
 args, rest = parser.parse_known_args()
 repo = args.repo.resolve()
-entry = repo / ".ai/scripts/delegate.py"
+entry = repo / ".ai/scripts/control.py"
 if not entry.is_file():
-    parser.error("--repo must contain .ai/scripts/delegate.py")
+    parser.error("--repo must contain .ai/scripts/control.py")
 raise SystemExit(subprocess.call([sys.executable, str(entry), "--repo", str(repo), *rest], cwd=repo))

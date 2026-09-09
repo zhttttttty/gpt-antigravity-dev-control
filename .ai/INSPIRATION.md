@@ -1,6 +1,6 @@
 # Design Inspirations
 
-V2 is an original project template. No source code from the projects below is required or copied by this template. The following public projects informed process ideas:
+This is an original project template. No source code from the projects below is required or copied by this template. The following public projects informed process ideas:
 
 - `QiQi14/multi-agents-control-plane` — repository-native `.ai/` control plane, task contracts, receipts, risk gates, generated agent adapters and evidence-first review.
 - `navels/neal` — separate planner/coder/reviewer roles, fresh coder context per scope, resumable artifact-driven runs.

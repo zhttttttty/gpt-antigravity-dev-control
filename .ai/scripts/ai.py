@@ -42,7 +42,7 @@ def repo_root(start=None):
             if (cur / ".ai").exists():
                 return cur
             cur = cur.parent
-        raise SystemExit("ERROR: not inside a Git repository or V2 template root")
+        raise SystemExit("ERROR: not inside a Git repository or control-plane root")
 
 
 def now():
@@ -331,7 +331,7 @@ def status(root):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="GPT-5.6 Sol × Antigravity V2 task helper")
+    ap = argparse.ArgumentParser(description="Core task protocol helper (compatibility entry point)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("validate"); p.add_argument("task_id")
     p = sub.add_parser("transition"); p.add_argument("task_id"); p.add_argument("state", choices=list(STATES))

@@ -1,8 +1,8 @@
-# V3.1 Local Delegation
+# Local Delegation Operations
 
 **Codex plans and reviews; Antigravity implements; a human approves merge.**
 No remote reviewer API, automatic merge, background scheduler or automatic retry
-is required. V2 remains the protocol baseline. The removed V3 Lite code is
+is required. Core Protocol artifacts remain the durable baseline. The removed V3 Lite code is
 preserved only on `archive/v3-lite`.
 
 ## Setup
@@ -11,14 +11,14 @@ Python 3.10+ and Git are required:
 
 ```sh
 python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/delegate.py --help
-python .ai/scripts/delegate.py probe
+python .ai/scripts/control.py --help
+python .ai/scripts/control.py probe
 ```
 
 On Windows, agy may be installed without a PATH entry:
 
 ```powershell
-python .ai/scripts/delegate.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .ai/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
 ```
 
 The adapter probes `--version` and `help`, storing output locally. The shipped
@@ -31,7 +31,7 @@ The model remains the CLI's configured default. No Hermes installation is needed
 ### Recommended: interactive approvals
 
 ```sh
-python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
 ```
 
 Run in a real terminal/PTY (not a redirected job). The controller inherits its
@@ -48,7 +48,7 @@ is not a JSON-only stream. `launch.log` notes that terminal output is not captur
 For a disposable, explicitly trusted worktree:
 
 ```sh
-python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --full-access --executable /absolute/path/to/agy
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access --executable /absolute/path/to/agy
 ```
 
 This requires `--approve`; it is never the default. It only skips agy tool
@@ -86,12 +86,12 @@ installing in a different scope; do not assume a permanent global install path.
 3. Inspect routing, confirm execution, prepare and launch:
 
 ```sh
-python .ai/scripts/ai.py validate TASK-001
-python .ai/scripts/delegate.py route TASK-001
-python .ai/scripts/delegate.py prepare TASK-001 --approve
-python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
-python .ai/scripts/delegate.py status TASK-001
-python .ai/scripts/delegate.py collect TASK-001
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
+python .ai/scripts/control.py status TASK-001
+python .ai/scripts/control.py collect TASK-001
 ```
 
 ```yaml
@@ -152,8 +152,8 @@ It does not manufacture individual test counts, token totals or independent PASS
 Missing evidence remains blocked. Actual test logs should be referenced by the
 executor; collection preserves but does not independently rerun those commands.
 
-Codex reviews selected diffs/tests, writes V2 QA/review artifacts, and invokes
-V2 transitions. COMPLETE leads only to REVIEW. Human integration stays explicit:
+Codex reviews selected diffs/tests, writes Core Protocol QA/review artifacts, and
+invokes reviewed transitions. COMPLETE leads only to REVIEW. Human integration stays explicit:
 commit controller artifacts, review/merge the implementation branch, reconcile
 PROJECT_STATE.yaml and preserve the task state. The controller never calls a
 model to review, never merges and never declares DONE.
@@ -182,7 +182,7 @@ model to review, never merges and never declares DONE.
   CLI using the generated context without invoking launch.
 - Missing/dirty receipt: fix the executor artifacts and collect again. Scope or
   failed reported checks move the task to BLOCKED, preserving full evidence.
-- REWORK: V2 REVIEW → READY archives receipts/increments attempt. BLOCKED → READY
+- REWORK: REVIEW → READY archives receipts/increments attempt. BLOCKED → READY
   is manual recovery. Commit controller state before preparing the next attempt.
 - Each preparation consumes one budget slot, including interrupted setup. At the
   limit escalate to Codex/human; never delete history to conceal failures.

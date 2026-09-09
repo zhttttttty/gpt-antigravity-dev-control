@@ -11,7 +11,7 @@ architecture, auth, migration, deployment, billing or destructive work.
 
 Use the repository CLI, not a second orchestrator or remote reviewer API:
 
-1. Prepare a V2 task with the optional execution block described in
+1. Prepare a Core Protocol task with the execution block described in
    [task protocol](references/task-protocol.md). Commit the task and use a clean
    checkout whose HEAD equals its configured base. Run `route TASK-ID`.
 2. Run `probe --executable <native-agy-path>` and inspect its help/version logs.
@@ -39,7 +39,7 @@ Use the repository CLI, not a second orchestrator or remote reviewer API:
    [receipt protocol](references/receipt-protocol.md) for missing evidence,
    targeted diffs, review and rework. Do not read full logs by default.
 
-Run from the target repository: `python .ai/scripts/delegate.py <command>`.
+Run from the target repository: `python .ai/scripts/control.py <command>`.
 The optional skill wrapper accepts `--repo <absolute-repository-path>` and
 forwards to that repository's CLI; inspect a new repository before executing it.
 Do not merge/release automatically. Full usage values remain unknown unless

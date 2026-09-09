@@ -1,60 +1,63 @@
 # Quick Start
 
-`main` uses V3.1 local delegation. It needs Git, Python, PyYAML, and a working
-local agy login; it does not need remote reviewer API keys or a scheduler.
+## 1. Install and inspect
 
-## 1. Install and probe
-
-```bash
+```sh
 python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/delegate.py probe
+python .ai/scripts/control.py status
+python .ai/scripts/control.py probe
 ```
 
-## 2. Initialize project context
+Probe verifies CLI discovery/help, not authentication or a successful model call.
 
-Ask Codex to read `AGENTS.md` and initialize `.ai/project/*` plus
-`.ai/state/PROJECT_STATE.yaml` for the real project.
+## 2. Create a task
 
-## 3. Create and validate a task
+Copy `.ai/templates/task/` to `.ai/tasks/queue/TASK-001/`. Fill its objective,
+scope, risk, acceptance evidence, checks, and `execution.mode`.
 
-Copy `.ai/templates/task/` to `.ai/tasks/queue/TASK-001/`, then fill the scope,
-risk, acceptance criteria, tests, and `execution` routing block.
-
-```bash
-python .ai/scripts/ai.py validate TASK-001
-python .ai/scripts/delegate.py route TASK-001
+```sh
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
 ```
 
-## 4. Delegate locally
+## 3A. Direct task
 
-```bash
-python .ai/scripts/delegate.py prepare TASK-001 --approve
-python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
-python .ai/scripts/delegate.py status TASK-001
-python .ai/scripts/delegate.py collect TASK-001
+Use `direct` when delegation overhead exceeds implementation effort:
+
+```sh
+python .ai/scripts/control.py start TASK-001 --worktree
 ```
 
-`collect` validates the branch, ancestry, scope, receipt, reported checks, and
-acceptance evidence. It moves a complete result to REVIEW, not DONE. Codex must
-independently inspect the relevant diff/tests; merge remains a human action.
+Implement within scope, record the Executor Receipt, then independently review
+the exact diff and evidence.
 
-For a disposable trusted worktree, add `--full-access` to the interactive launch.
-This requires `--approve` and only skips agy confirmations.
+## 3B. Delegated task
 
-See [Local Delegation](LOCAL_DELEGATION.md) for approval files, recovery, compact
-receipts, and failure handling.
+Use `delegated` for bounded implementation that local agy can verify:
 
-## 5. Manual V2-compatible flow
-
-Tasks that should not be delegated can use the existing helper directly:
-
-```bash
-python .ai/scripts/ai.py start TASK-001 --worktree
-python .ai/scripts/ai.py transition TASK-001 REVIEW
-python .ai/scripts/ai.py transition TASK-001 DONE
+```sh
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
+python .ai/scripts/control.py status TASK-001
+python .ai/scripts/control.py collect TASK-001
 ```
 
-## 6. High-risk work
+Collection moves complete evidence to REVIEW, not DONE. Codex independently
+checks relevant diffs and tests; a human merges.
 
-High-risk tasks remain fail-closed. Required review artifacts and human approval
-must exist before the final gate can pass.
+## 3C. Approval-required task
+
+High-risk or architecture-authority tasks resolve to `approval_required`. Create
+the contract-bound approval artifact described in
+[Local Delegation Operations](LOCAL_DELEGATION.md), then pass it to `prepare`.
+
+## 4. Review and close
+
+After writing `receipt.qa.yaml` and `review.yaml`:
+
+```sh
+python .ai/scripts/control.py transition TASK-001 DONE
+```
+
+Only do this after the required Risk Gates pass. Reconcile project state and
+merge explicitly; the controller does neither automatically.

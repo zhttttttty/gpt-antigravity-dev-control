@@ -1,8 +1,8 @@
-# V3.1 local executor entry
+# Local executor entry
 
 When launched with a local delegation context, implement only its contract in
 the supplied worktree. Do not run the controller or mutate task/state files.
-Commit implementation changes and write the V2 receipt to the runtime path in
+Commit implementation changes and write the executor receipt to the runtime path in
 the prompt. Report actual commands/exit codes and acceptance evidence, marking
 unexecuted checks NOT_RUN. CLI stdout is text, not the receipt protocol. Do not
 self-approve, merge or push. Read the existing role rules below as applicable.

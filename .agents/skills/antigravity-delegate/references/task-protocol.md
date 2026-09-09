@@ -1,6 +1,7 @@
 # Task routing
 
-Preserve schema_version 2 and all existing V2 fields. Add:
+Preserve `schema_version: 2` for file compatibility and all Core Protocol fields.
+Set execution routing with:
 
 ```yaml
 execution:
@@ -24,4 +25,4 @@ For gated tasks, `route` reports a contract hash. A human creates an approval
 YAML outside versioned task files with task_id, contract_sha256,
 result: APPROVED, approved_by and evidence (ADR/review reference). Pass its path
 to prepare using --approval-file. This records pre-review, not merge approval
-and not a cryptographic proof of identity. Keep V2 merge gates intact.
+and not a cryptographic proof of identity. Keep Core Protocol merge gates intact.

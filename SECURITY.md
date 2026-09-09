@@ -8,7 +8,7 @@ For a suspected vulnerability, open a minimal GitHub issue without sensitive exp
 
 ## Secret handling
 
-V3.1 delegates through the user's local agy installation. Keep authentication in
+The local control plane delegates through the user's agy installation. Keep authentication in
 the CLI's supported credential store; do not copy tokens, account data, or private
 repository credentials into task contracts, context packs, receipts, or commits.
 

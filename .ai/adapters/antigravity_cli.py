@@ -31,7 +31,7 @@ class AntigravityCLI:
             "Do not access home, scratch or parent directories. Implement only the contract. "
             "Use native file creation/edit tools (nonempty content), not multiline shell or encoded Python commands to write files. "
             "Run the required test commands and save actual test output locally. Commit implementation files only. "
-            "Fill the existing V2 executor receipt at {receipt} using native file editing, then STOP. "
+            "Fill the executor receipt at {receipt} using native file editing, then STOP. "
             "Do not read/write QA or review files, expand scope, merge, push, or claim unexecuted tests passed. "
             "If a permission is denied, report the blocker; do not search alternative directories.")
         args = self.args if self.args is not None else [

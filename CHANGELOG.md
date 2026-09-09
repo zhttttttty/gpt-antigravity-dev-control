@@ -2,6 +2,15 @@
 
 All notable changes are documented here.
 
+## [3.1.2-local] - 2026-09-09
+
+- Unify direct, delegated, and approval-required work under one Core Protocol.
+- Add `.ai/scripts/control.py` as the primary CLI while retaining `ai.py` and
+  `delegate.py` as compatibility modules.
+- Remove the duplicate `.ai/VERSION`; root `VERSION` is now authoritative.
+- Replace V2/V3.1 mode comparisons with execution-mode and unified-workflow docs.
+- Limit main-branch CI to the unified CLI and add facade routing tests.
+
 ## [3.1.1-local] - 2026-09-09
 
 - Preserve the former V3 Lite implementation on `archive/v3-lite` and remove its

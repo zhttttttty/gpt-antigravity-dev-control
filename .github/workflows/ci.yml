@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, v2]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -30,13 +30,13 @@ jobs:
           PY
       - name: CLI smoke checks
         run: |
-          python .ai/scripts/ai.py status
-          python .ai/scripts/delegate.py --help
-      - name: Validate example task against V2 contract
+          python .ai/scripts/control.py status
+          python .ai/scripts/control.py --help
+      - name: Validate example task against Core Protocol
         run: |
           mkdir -p .ai/tasks/queue
           cp -R examples/minimal-task .ai/tasks/queue/TASK-EXAMPLE
-          python .ai/scripts/ai.py validate TASK-EXAMPLE
+          python .ai/scripts/control.py validate TASK-EXAMPLE
           rm -rf .ai/tasks/queue/TASK-EXAMPLE
       - name: Local delegation regression tests (no provider calls)
         run: python -m unittest discover -s tests -v

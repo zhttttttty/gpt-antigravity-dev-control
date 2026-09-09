@@ -1,9 +1,11 @@
-# ADR-001: Local delegation as the preferred V3.1 path
+# ADR-001: Local delegation inside the unified control plane
 
-Status: accepted for implementation by the project owner's V3.1 request.
+Status: accepted and unified with the Core Protocol.
 
-Keep the V2 contract, state machine, receipts and merge gates. Add a separate
-Python CLI using local Git worktrees and a replaceable executor adapter. The
+Keep the task contract, state machine, receipts and merge gates. Add local Git
+worktree delegation through a replaceable executor adapter. Expose task and
+delegation operations through one `control.py` entry point while retaining the
+older Python files as compatibility modules. The
 former V3 Lite remote implementation is preserved on `archive/v3-lite` and
 removed from `main` because this project does not require remote concurrent
 scheduling.

@@ -1,10 +1,10 @@
 # Architecture
 
-## V3.1 local-first path
+## Unified local-first path
 
-Codex skill → `.ai/scripts/delegate.py` → executor interface / local agy →
+Codex skill → `.ai/scripts/control.py` → Core Protocol or local agy adapter →
 isolated Git worktree → compact receipt → independent Codex review → human merge.
-The controller reuses the V2 state machine and does not call a remote reviewer,
+All execution modes share one state machine. The controller does not call a remote reviewer,
 run a background scheduler, or maintain a second task database.
 
 ```mermaid

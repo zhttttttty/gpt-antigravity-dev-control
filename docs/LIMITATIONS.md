@@ -1,6 +1,6 @@
 # Current limitations
 
-V3.1 is intentionally a local, human-supervised delegation controller rather
+The control plane is intentionally local and human-supervised rather
 than a distributed automation platform.
 
 - A working local agy installation, login, and tool permissions are required.

@@ -8,8 +8,8 @@
 
 ## Layer
 
-- [ ] V2 protocol
-- [ ] V3.1 local delegation
+- [ ] Core Protocol
+- [ ] Local delegation
 - [ ] Local executor adapter
 - [ ] Documentation / examples
 

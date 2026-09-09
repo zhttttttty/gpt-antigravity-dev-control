@@ -2,60 +2,78 @@
 
 [English](README.md)
 
-推荐流程：**Codex 规划与验收 → 本地 agy + 独立 Worktree 实施 → 精简回执 → 人工合并**。
-V2 的 Task、Risk Gate、Receipt、状态机和 Worktree 规则继续作为稳定协议。
+统一流程：**Codex 规划与验收 → 按任务路由直接实施或交给本地 Antigravity →
+精简回执 → 人工合并**。
+
+项目现在只有一套核心协议和一个主要命令入口，不再把 V2 与 V3.1 描述成两套模式。
+
+## 快速开始
 
 ```powershell
 python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/delegate.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
-python .ai/scripts/delegate.py --help
+python .ai/scripts/control.py status
+python .ai/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .ai/scripts/control.py --help
 ```
 
-仓库内已提供 `$antigravity-delegate` 技能，无需 Hermes 或远程 Reviewer API。
-小任务直接执行；边界明确的多文件实现与测试交给 Antigravity；高风险任务先审批。
-默认不会自动重试、自动合并或后台批量调度。
+每个任务通过 `execution.mode` 选择执行方式：
 
-## 核心流程
-
-```text
-需求 → Codex 规划 → task.yaml → 本地 agy / Worktree
-     → Compact Receipt + 本地日志 → Codex 独立验收 → 人工合并
+```yaml
+execution:
+  mode: delegated  # direct | delegated | approval_required
+  adapter: antigravity_cli
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 2
+  escalation: codex_review
 ```
 
-推荐在真实终端使用 `launch --interactive` 逐项审批。若一次性可信 Worktree
-确需免逐项确认，可显式使用：
+| 模式 | 用途 |
+|---|---|
+| `direct` | Codex 或人工直接完成小型修改 |
+| `delegated` | 本地 agy 在独立 Worktree 完成边界明确的实现与测试 |
+| `approval_required` | 架构、安全、迁移、部署或其他高风险任务先审批再委派 |
+
+三种模式共用同一套 Task Contract、状态机、Risk Gate、Receipt、Review 和人工合并门。
+
+## 统一命令入口
 
 ```powershell
-python .ai/scripts/delegate.py launch TASK-001 --approve --interactive --full-access --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .ai/scripts/control.py collect TASK-001
 ```
 
-该参数只向 agy 传递 `--dangerously-skip-permissions`，不会授予 Windows 管理员权限；
-任务范围、回执、Review 与人工合并门仍然生效。
+原 `ai.py` 和 `delegate.py` 暂时保留为兼容入口，新使用方式统一采用 `control.py`。
 
-## 分支定位
+一次性可信 Worktree 如需免逐项确认，可显式增加 `--full-access`。它只向 agy
+传递 `--dangerously-skip-permissions`，不授予 Windows 管理员权限，也不会绕过
+任务范围、回执、验收和人工合并门。
 
-| 分支 | 定位 |
-|---|---|
-| `main` | V3.1 本地委派主线 |
-| `v2` | 纯手动协议基线 |
-| `archive/v3-lite` | 已归档的远程 API / SQLite Orchestrator，仅供历史追溯 |
+## 核心原则
 
-V3 Lite 已从 `main` 移除；归档见
-[`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite)。
+1. `.ai/` 与 Git 是长期事实源。
+2. `task.yaml` 同时定义范围、权限、风险、路由和验收条件。
+3. Executor 完成不等于 Reviewer 验收通过。
+4. 缺失证据按失败关闭处理；REWORK 保留旧证据。
+5. 完整日志留在本地，默认先读取精简回执。
+6. 控制器不会自动合并，也不会自行宣布任务 DONE。
 
-## 设计原则
-
-1. 仓库与 Git，而不是聊天记录，是长期事实源。
-2. Executor 不得自行扩大 scope 或修改架构权限。
-3. “实现完成”不等于“验收通过”。
-4. 关键结论必须有可检查 Evidence。
-5. 高风险变更必须经过独立 Review 和人工审批门。
-6. REWORK 不覆盖旧证据；完整日志留在本地，默认只回传摘要。
-
-详细说明：
+## 文档
 
 - [快速开始](docs/QUICK_START.md)
-- [V3.1 操作与恢复指南](docs/LOCAL_DELEGATION.md)
+- [统一控制流程](docs/CONTROL_WORKFLOW.md)
+- [执行模式](docs/EXECUTION_MODES.md)
+- [本地委派与恢复](docs/LOCAL_DELEGATION.md)
 - [架构](docs/ARCHITECTURE.md)
-- [V2 / V3.1 对比](docs/V2_V3_1_COMPARISON.md)
-- [用量测量方法](COST_METRICS.md)
+- [当前限制](docs/LIMITATIONS.md)
+- [用量测量](COST_METRICS.md)
+
+## 历史分支
+
+- `v2`：纯手动协议历史基线。
+- [`archive/v3-lite`](https://github.com/zhttttttty/gpt-antigravity-dev-control/tree/archive/v3-lite)：已移除的远程 API / SQLite 调度实验。
+
+它们都不再是 `main` 上需要选择的运行模式。当前版本：**3.1.2-local**。

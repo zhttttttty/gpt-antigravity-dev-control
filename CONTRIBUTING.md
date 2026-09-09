@@ -4,10 +4,10 @@ Contributions are welcome.
 
 ## Principles
 
-- Keep V2 protocol semantics backward-compatible unless a versioned migration is provided.
+- Keep Core Protocol semantics backward-compatible unless a versioned migration is provided.
 - Keep the executor bounded by `task.yaml` authority.
 - Prefer repository evidence over model claims.
-- Keep V3.1 local-first and summary-first; do not add remote scheduling or reviewer
+- Keep the control plane local-first and summary-first; do not add remote scheduling or reviewer
   services to `main`.
 
 ## Development
@@ -15,8 +15,8 @@ Contributions are welcome.
 ```bash
 python -m pip install -r .ai/scripts/requirements-local.txt
 python -m compileall .ai/scripts .ai/adapters .agents/skills
-python .ai/scripts/ai.py status
-python .ai/scripts/delegate.py --help
+python .ai/scripts/control.py status
+python .ai/scripts/control.py --help
 python -m unittest discover -s tests -v
 ```
 

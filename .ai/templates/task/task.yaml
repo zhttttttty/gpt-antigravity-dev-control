@@ -5,7 +5,7 @@ status: READY
 contract_revision: 1
 attempt: 1
 
-# Optional V3.1 routing. Legacy tasks without execution remain direct.
+# Execution routing in the unified protocol. Older tasks without it remain direct.
 execution:
   mode: direct
   adapter: antigravity_cli

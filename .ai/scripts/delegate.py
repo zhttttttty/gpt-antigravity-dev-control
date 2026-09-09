@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""V3.1 local, single-task delegation. No remote calls or automatic merge."""
+"""Local single-task delegation (compatibility entry point)."""
 from __future__ import annotations
 
 import argparse
@@ -55,7 +55,7 @@ def git(root, *args):
 
 
 def transition(root, ident, target):
-    # V2 helper is chatty; preserve a single JSON document on this CLI's stdout.
+    # The core helper is chatty; preserve one JSON document on this CLI's stdout.
     with contextlib.redirect_stdout(io.StringIO()):
         return ai.transition(root, ident, target)
 
@@ -92,7 +92,7 @@ def load_task(root, ident):
     task_id(ident)
     state, folder = ai.find_task(root, ident)
     if not ai.validate_task(root, ident, quiet=True):
-        raise ValueError("Invalid V2 contract; run ai.py validate")
+        raise ValueError("Invalid task contract; run control.py validate")
     return state, folder, read_yaml(folder / "task.yaml")
 
 
@@ -165,7 +165,7 @@ def prepare(root, ident, approved=False, approval=None):
         chunks.append(f"\n## {name}\n{path.read_text(encoding='utf-8')}")
     pack = ("Implement this one contract in this worktree. Do not alter task/control files, merge, or self-approve. "
             "Read relevant GEMINI.md and .ai/rules as needed. Run required checks; record actual evidence. "
-            "Commit implementation changes only. Write a V2 executor receipt to .ai/runtime/delegation/receipt.executor.yaml. "
+            "Commit implementation changes only. Write the executor receipt to .ai/runtime/delegation/receipt.executor.yaml. "
             "A CLI launch is not task completion. Stop on architecture decisions.\n" + "".join(chunks))
     if len(pack.encode("utf-8")) > 32_000:
         raise ValueError("Compact context exceeds 32KB; split/reduce task without truncating its contract")

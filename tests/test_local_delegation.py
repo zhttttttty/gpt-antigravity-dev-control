@@ -230,11 +230,11 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertEqual(cp.returncode, 0, cp.stderr)
         self.assertEqual(json.loads(cp.stdout)["phase"], "PREPARED")
 
-    def test_high_risk_v2_flags_still_required(self):
+    def test_high_risk_core_flags_still_required(self):
         self.task["planning"]["risk"] = "high"
         self.write_task(); self.commit()
         self.assertEqual(d.route(self.task)["mode"], "approval_required")
-        with self.assertRaisesRegex(ValueError, "Invalid V2 contract"):
+        with self.assertRaisesRegex(ValueError, "Invalid task contract"):
             self.prepare()
 
     def test_nonzero_executor_does_not_complete(self):

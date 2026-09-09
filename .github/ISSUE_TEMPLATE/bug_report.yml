@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: Version / branch
-      placeholder: "main 3.1.1-local or v2"
+      placeholder: "main 3.1.2-local"
     validations:
       required: true
   - type: textarea

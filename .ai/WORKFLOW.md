@@ -1,102 +1,48 @@
-# V2 Operating Workflow
+# Unified Operating Workflow
 
-## Phase 0 — Intake
+## 1. Plan
 
-Human gives an objective, brief, issue, spec or change request.
+Codex reads canonical project/state artifacts, defines one bounded task, selects
+risk and authority, sets scope and acceptance evidence, and chooses
+`execution.mode`.
 
-GPT-5.6 Sol converts it into repository artifacts. Chat is temporary; artifacts are durable.
-
-## Phase 1 — Planning
-
-GPT-5.6 Sol:
-
-1. Reads canonical project/state artifacts.
-2. Resolves requirement and architecture implications.
-3. Splits work into the smallest independently reviewable task.
-4. Sets task risk independently from executor capability.
-5. Sets writable/protected scope.
-6. Defines objective acceptance evidence.
-7. Creates the task under `.ai/tasks/queue/<TASK-ID>/`.
-
-A task cannot become READY without a valid contract.
-
-## Phase 2 — Dispatch
-
-Before execution:
-
-- validate task;
-- check dependencies;
-- create worktree when required;
-- record base commit;
-- give Antigravity only the relevant task + architecture context.
-
-Recommended:
-
-```bash
-python .ai/scripts/ai.py validate TASK-001
-python .ai/scripts/ai.py start TASK-001 --worktree
+```sh
+python .ai/scripts/control.py validate TASK-001
+python .ai/scripts/control.py route TASK-001
 ```
 
-## Phase 3 — Execution
+## 2. Execute
 
-Antigravity:
+- `direct`: Codex or a human implements under the task contract.
+- `delegated`: local agy implements in the prepared task worktree.
+- `approval_required`: contract-bound approval precedes local delegation.
 
-1. starts from a fresh task context where practical;
-2. implements only the task;
-3. runs required checks;
-4. fills `receipt.executor.yaml`;
-5. hands off without self-approval.
+```sh
+# direct
+python .ai/scripts/control.py start TASK-001 --worktree
 
-If the task contract cannot be satisfied without an architecture or scope change, stop and escalate.
+# delegated
+python .ai/scripts/control.py prepare TASK-001 --approve
+python .ai/scripts/control.py launch TASK-001 --approve --interactive
+python .ai/scripts/control.py collect TASK-001
+```
 
-## Phase 4 — Review
+The executor modifies only writable scope, runs required checks, writes the
+Executor Receipt, and never self-approves or merges.
 
-GPT-5.6 Sol independently reads:
+## 3. Review
 
-- immutable/intended task contract;
-- exact task diff or commit range;
-- executor receipt;
-- test evidence;
-- architecture and ADRs.
+Codex independently reviews the exact diff/commit range and evidence. Allowed
+verdicts are `PASS`, `PASS_WITH_NOTES`, `REWORK`, and `BLOCKED`. Missing evidence
+does not become an inferred PASS.
 
-Reviewer checks:
+## 4. Close
 
-1. objective;
-2. scope;
-3. acceptance evidence;
-4. regression risk;
-5. architecture compliance;
-6. security;
-7. maintainability;
-8. unverified claims.
+After QA/review artifacts and Risk Gates pass:
 
-Allowed verdicts:
+```sh
+python .ai/scripts/control.py transition TASK-001 DONE
+```
 
-- `PASS`
-- `PASS_WITH_NOTES`
-- `REWORK`
-- `BLOCKED`
-
-The reviewer should not silently edit the implementation. For REWORK, state concrete findings and either transition the same task back to READY with incremented attempt or create a bounded fix task.
-
-## Phase 5 — Closeout
-
-On PASS/PASS_WITH_NOTES:
-
-- fill `receipt.qa.yaml` and `review.yaml`;
-- transition to DONE;
-- reconcile `.ai/state/PROJECT_STATE.yaml`;
-- update feature ledger / API surface / decisions if durable knowledge changed;
-- merge only after required risk gates are satisfied.
-
-## Phase 6 — Resume / Recovery
-
-A new model/session should recover from artifacts:
-
-1. `.ai/state/PROJECT_STATE.yaml`
-2. current task folder
-3. receipts/review
-4. Git branch/worktree and commits
-5. relevant ADR/memory
-
-Never require the original conversation to resume safely.
+Reconcile project state and merge explicitly. Preserve attempt evidence for
+REWORK. A new session resumes from repository artifacts and Git, not chat memory.

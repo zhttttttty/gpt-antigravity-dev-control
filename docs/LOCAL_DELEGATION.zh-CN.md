@@ -45,7 +45,9 @@ Receipt、Review 或人工合并门。永远不要静默启用。
     powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1 -OutputDir .ai/runtime/review-run
     powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <JSON 中的 path>
 
-默认最多并发两个代理；任务可以声明 `depends_on`、`max_retries` 和
+默认并发两个代理，硬性最大值为四个。请求三个或四个时会先启动两个，首个任务成功后
+才提升到目标并发。大型只读或多文档任务可以使用三到四个；写入任务默认仍限制为两个，
+除非显式传入 `-AllowHighWriteConcurrency`。任务可以声明 `depends_on`、`max_retries` 和
 `timeout_seconds`。依赖关系会按 DAG 校验；只读代理可以共享 Worktree，并发任务中只要
 有一个具备写权限，该 Worktree 就会被独占。首次失败最多自动重试一次，并将本次运行
 剩余阶段降为单并发。用户级启动锁会阻止两个调度器同时占用 agy。

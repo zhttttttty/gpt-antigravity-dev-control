@@ -85,7 +85,8 @@ independent proof, or upgrades COMPLETE directly to DONE.
 - full local logs plus summary-first receipts;
 - fail-closed scope and evidence checks;
 - no automatic merge, unbounded retry loop, or parallel remote scheduler;
-- optional local multi-agent coordination capped at two processes with one retry.
+- optional local multi-agent coordination: two processes by default, healthy
+  ramp-up to four for read-only workloads, and one bounded retry.
 
 Local runtime records are recoverable evidence, not durable project truth. If a
 runtime record disagrees with committed task artifacts or Git history, reconcile

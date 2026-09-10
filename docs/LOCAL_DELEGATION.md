@@ -80,8 +80,11 @@ powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1
 powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <path-from-json>
 ```
 
-The launcher caps concurrency at two and keeps `sessions.json`, reports, stderr,
-and execution logs together. Task entries may declare `depends_on`,
+The launcher defaults to two concurrent agents and allows up to four. Requests
+above two begin at two and ramp up after the first successful completion. Large
+read-only/document workloads may request three or four; writing workloads remain
+capped at two unless `-AllowHighWriteConcurrency` is explicit. It keeps
+`sessions.json`, reports, stderr, and execution logs together. Task entries may declare `depends_on`,
 `max_retries`, and `timeout_seconds`. Dependencies are validated as a DAG;
 read-only agents may share a Worktree, while any writer receives exclusive
 Worktree access. The first failure is retried once at most and reduces the rest

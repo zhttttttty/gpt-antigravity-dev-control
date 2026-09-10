@@ -45,6 +45,40 @@ $readerOverlap = Run-Pair "readers" "plan"
 Assert-True (-not $writerOverlap) "Writers overlapped in the same worktree"
 Assert-True $readerOverlap "Read-only agents did not run concurrently"
 
+$scaleOutput = Join-Path $runtime "read-only-scale"
+New-Item -ItemType Directory -Path $scaleOutput | Out-Null
+$scaleConfig = Join-Path $scaleOutput "agents.json"
+Save-Config ([ordered]@{ tasks = @(
+    [ordered]@{ name = "probe"; worktree = $repo; mode = "plan"; prompt = "SLEEP:200 probe"; max_retries = 0 },
+    [ordered]@{ name = "long"; worktree = $repo; mode = "plan"; prompt = "SLEEP:1200 long"; max_retries = 0 },
+    [ordered]@{ name = "doc1"; worktree = $repo; mode = "plan"; prompt = "SLEEP:400 doc1"; max_retries = 0 },
+    [ordered]@{ name = "doc2"; worktree = $repo; mode = "plan"; prompt = "SLEEP:400 doc2"; max_retries = 0 },
+    [ordered]@{ name = "doc3"; worktree = $repo; mode = "plan"; prompt = "SLEEP:400 doc3"; max_retries = 0 }
+) }) $scaleConfig
+& powershell -NoProfile -ExecutionPolicy Bypass -File $launch -ConfigPath $scaleConfig -OutputDir $scaleOutput -Executable $fakeAgy -MaxConcurrency 4 -MaxRetries 0 -DefaultTimeoutSeconds 60 | Out-Null
+Assert-True ($LASTEXITCODE -eq 0) "Read-only scale launch failed"
+$scaleRegistry = Get-Content (Join-Path $scaleOutput "sessions.json") -Raw | ConvertFrom-Json
+$longEnd = [datetime]$scaleRegistry.sessions[1].attempts[0].completed_utc
+$rampedStarts = @($scaleRegistry.sessions | Select-Object -Skip 2 | Where-Object { [datetime]$_.attempts[0].started_utc -lt $longEnd }).Count
+Assert-True ($scaleRegistry.target_max_concurrency -eq 4) "Read-only target concurrency was not four"
+Assert-True $scaleRegistry.ramp_up_completed "Read-only ramp-up did not complete"
+Assert-True ($rampedStarts -eq 3) "Read-only workload did not ramp from two to four"
+
+$writerCapOutput = Join-Path $runtime "writer-cap"
+New-Item -ItemType Directory -Path $writerCapOutput | Out-Null
+$writerCapConfig = Join-Path $writerCapOutput "agents.json"
+Save-Config ([ordered]@{ tasks = @(
+    [ordered]@{ name = "w1"; worktree = $repo; mode = "accept-edits"; prompt = "w1" },
+    [ordered]@{ name = "w2"; worktree = $repo; mode = "accept-edits"; prompt = "w2" },
+    [ordered]@{ name = "w3"; worktree = $repo; mode = "accept-edits"; prompt = "w3" },
+    [ordered]@{ name = "w4"; worktree = $repo; mode = "accept-edits"; prompt = "w4" }
+) }) $writerCapConfig
+& powershell -NoProfile -ExecutionPolicy Bypass -File $launch -ConfigPath $writerCapConfig -OutputDir $writerCapOutput -Executable $fakeAgy -MaxConcurrency 4 -DryRun | Out-Null
+Assert-True ($LASTEXITCODE -eq 0) "Writer cap dry-run failed"
+$writerCapRegistry = Get-Content (Join-Path $writerCapOutput "sessions.json") -Raw | ConvertFrom-Json
+Assert-True ($writerCapRegistry.target_max_concurrency -eq 2) "Writer workload was not capped at two"
+Assert-True $writerCapRegistry.writer_concurrency_capped "Writer cap was not recorded"
+
 $largeOutput = Join-Path $runtime "large-output"
 New-Item -ItemType Directory -Path $largeOutput | Out-Null
 $largeConfig = Join-Path $largeOutput "agents.json"

@@ -50,7 +50,8 @@ receipt collection, review, and recovery flow; agy is started only as the local
 implementation subprocess.
 
 Codex may select the Skill automatically for bounded multi-file work. Multi-agent
-runs use a dependency DAG, a maximum concurrency of two, separate Worktrees for
+runs use a dependency DAG, two concurrent agents by default, up to four for
+large read-only workloads after a healthy ramp-up, separate Worktrees for
 independent writers, one bounded retry with serial fallback, and a compact
 `summary.json`/`handoff.md` review handoff.
 
@@ -125,7 +126,7 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ## Status
 
-Current version: **3.1.3-local**. The project is a local control workflow; no
+Current version: **3.1.4-local**. The project is a local control workflow; no
 remote scheduler, reviewer API, or fixed token-savings claim is required.
 
 ## License

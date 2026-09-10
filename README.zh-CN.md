@@ -55,7 +55,7 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 验收和恢复；agy 只作为 Codex 启动的本地实现子进程。
 
 对于边界明确的多文件任务，Codex 可以自动选择该 Skill。多代理运行支持依赖 DAG、
-最多两个并发、独立写入 Worktree、失败一次后降为单并发重试，以及
+默认两个并发、大型只读任务健康探测后最多四个并发、独立写入 Worktree、失败一次后降为单并发重试，以及
 `summary.json`/`handoff.md` 精简验收交接。
 
 一次性可信 Worktree 如需免逐项确认，可显式增加 `--full-access`。它只向 agy
@@ -87,4 +87,4 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 - [当前限制](docs/LIMITATIONS.md)
 - [用量测量](COST_METRICS.md)
 
-当前版本：**3.1.3-local**。
+当前版本：**3.1.4-local**。

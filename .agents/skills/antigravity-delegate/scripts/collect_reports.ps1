@@ -73,7 +73,12 @@ try {
         run_id = $registry.run_id
         status = $summaryStatus
         requested_max_concurrency = $registry.requested_max_concurrency
+        target_max_concurrency = $registry.target_max_concurrency
         effective_max_concurrency = $registry.effective_max_concurrency
+        concurrency_policy = $registry.concurrency_policy
+        writer_concurrency_capped = $registry.writer_concurrency_capped
+        ramp_up_completed = $registry.ramp_up_completed
+        ramp_up_aborted = $registry.ramp_up_aborted
         downgraded_to_serial = $registry.downgraded_to_serial
         total = $total
         completed = $completed
@@ -94,7 +99,7 @@ try {
     $lines.Add("")
     $lines.Add("Run: " + $registry.run_id)
     $lines.Add("Status: " + $summaryStatus)
-    $lines.Add("Concurrency: requested " + $registry.requested_max_concurrency + ", effective " + $registry.effective_max_concurrency)
+    $lines.Add("Concurrency: requested " + $registry.requested_max_concurrency + ", target " + $registry.target_max_concurrency + ", effective " + $registry.effective_max_concurrency + ", policy " + $registry.concurrency_policy)
     $lines.Add("")
     $lines.Add("## Agent results")
     $lines.Add("")

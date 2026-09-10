@@ -15,7 +15,8 @@ than a distributed automation platform.
   one automatic retry and then stops; there is no unattended retry loop.
 - Runtime cleanup, crash-safe multi-file transactions, automatic backup, metrics
   ingestion, and unattended batch scheduling are not implemented. Local parallel
-  dispatch is limited to two agents and does not coordinate remote workers.
+  dispatch supports up to four read-only agents after ramp-up; writing workloads
+  stay capped at two unless explicitly overridden. Remote workers are not coordinated.
 - Full-access mode skips agy confirmations and therefore belongs only in a
   disposable trusted worktree; it does not grant administrator rights.
 - Compact receipts report observed Git state and executor claims. Codex still

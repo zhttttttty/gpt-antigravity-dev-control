@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
     [string]$Executable = "agy",
     [string]$CapabilitiesPath = "",
-    [ValidateRange(1,2)][int]$MaxConcurrency = 2,
+    [ValidateRange(1,4)][int]$MaxConcurrency = 2,
+    [switch]$AllowHighWriteConcurrency,
     [ValidateRange(0,1)][int]$MaxRetries = 1,
     [ValidateRange(30,86400)][int]$DefaultTimeoutSeconds = 1260,
     [string]$LockPath = "",
@@ -83,7 +84,13 @@ try {
         status = "preparing"
         executable = $exePath
         requested_max_concurrency = $MaxConcurrency
-        effective_max_concurrency = $MaxConcurrency
+        target_max_concurrency = $MaxConcurrency
+        effective_max_concurrency = [Math]::Min($MaxConcurrency, 2)
+        concurrency_policy = "standard"
+        writer_concurrency_capped = $false
+        ramp_up_pending = ($MaxConcurrency -gt 2)
+        ramp_up_completed = $false
+        ramp_up_aborted = $false
         downgraded_to_serial = $false
         max_retries = $MaxRetries
         capabilities_file = $capabilityFile
@@ -165,6 +172,21 @@ try {
             if ($dependency -eq $record.name) { throw "Task cannot depend on itself: $dependency" }
         }
     }
+
+    $targetConcurrency = [Math]::Min($MaxConcurrency, @($registry.sessions).Count)
+    $hasWriters = (@($registry.sessions | Where-Object { $_.writes })).Count -gt 0
+    if ($hasWriters -and $targetConcurrency -gt 2 -and -not $AllowHighWriteConcurrency) {
+        $targetConcurrency = 2
+        $registry.writer_concurrency_capped = $true
+        $registry.concurrency_policy = "writer-safe-cap"
+    } elseif ($targetConcurrency -gt 2 -and $hasWriters) {
+        $registry.concurrency_policy = "explicit-high-write"
+    } elseif ($targetConcurrency -gt 2) {
+        $registry.concurrency_policy = "read-only-ramp"
+    }
+    $registry.target_max_concurrency = $targetConcurrency
+    $registry.effective_max_concurrency = [Math]::Min($targetConcurrency, 2)
+    $registry.ramp_up_pending = ($targetConcurrency -gt 2)
 
     $remaining = @{}
     foreach ($record in @($registry.sessions)) { $remaining[$record.name] = $record }
@@ -332,6 +354,11 @@ try {
                 if ($attemptStatus -eq "completed") {
                     $job.record.status = "completed"
                     $job.record.exit_code = $job.process.ExitCode
+                    if ($registry.ramp_up_pending -and -not $registry.downgraded_to_serial) {
+                        $registry.effective_max_concurrency = $registry.target_max_concurrency
+                        $registry.ramp_up_pending = $false
+                        $registry.ramp_up_completed = $true
+                    }
                 } elseif ($job.record.attempt -lt $job.record.max_attempts) {
                     $job.record.status = "queued"
                     $job.record.failure_reason = $attemptStatus
@@ -339,6 +366,8 @@ try {
                     $job.record.session_id = $null
                     $registry.effective_max_concurrency = 1
                     $registry.downgraded_to_serial = $true
+                    $registry.ramp_up_pending = $false
+                    $registry.ramp_up_aborted = $true
                 } else {
                     $job.record.status = "failed"
                     $job.record.exit_code = if ($timedOut) { $null } else { $job.process.ExitCode }

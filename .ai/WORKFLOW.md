@@ -1,50 +1,11 @@
-# Unified Operating Workflow
+# 工作流索引
 
-[中文](WORKFLOW.zh-CN.md)
+规划、执行、审查、收尾和恢复统一维护在
+[统一控制流程](../docs/CONTROL_WORKFLOW.md)，本页保留为兼容入口。
 
-## 1. Plan
+按当前阶段读取：
+- [编排规则](rules/ORCHESTRATION.md)：原生/本地路由、并发与版本交接。
+- [风险门](rules/RISK_GATES.md)：不同影响等级的验收要求。
+- [权限边界](rules/AUTHORITY.md)：架构变更与审批。
 
-Codex reads canonical project/state artifacts, defines one bounded task, selects
-risk and authority, sets scope and acceptance evidence, and chooses
-`execution.mode`.
-
-```sh
-python .ai/scripts/control.py validate TASK-001
-python .ai/scripts/control.py route TASK-001
-```
-
-## 2. Execute
-
-- `direct`: Codex or a human implements under the task contract.
-- `delegated`: local agy implements in the prepared task worktree.
-- `approval_required`: contract-bound approval precedes local delegation.
-
-```sh
-# direct
-python .ai/scripts/control.py start TASK-001 --worktree
-
-# delegated
-python .ai/scripts/control.py prepare TASK-001 --approve
-python .ai/scripts/control.py launch TASK-001 --approve --interactive
-python .ai/scripts/control.py collect TASK-001
-```
-
-The executor modifies only writable scope, runs required checks, writes the
-Executor Receipt, and never self-approves or merges.
-
-## 3. Review
-
-Codex independently reviews the exact diff/commit range and evidence. Allowed
-verdicts are `PASS`, `PASS_WITH_NOTES`, `REWORK`, and `BLOCKED`. Missing evidence
-does not become an inferred PASS.
-
-## 4. Close
-
-After QA/review artifacts and Risk Gates pass:
-
-```sh
-python .ai/scripts/control.py transition TASK-001 DONE
-```
-
-Reconcile project state and merge explicitly. Preserve attempt evidence for
-REWORK. A new session resumes from repository artifacts and Git, not chat memory.
+`workflows/` 的阶段链接继续保留，避免已有调用失效。

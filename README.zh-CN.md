@@ -30,7 +30,7 @@ execution:
 
 | 模式 | 用途 |
 |---|---|
-| `direct` | Codex 或人工直接完成小型修改 |
+| `direct` | Root、人工或原生 Codex worker 按契约实现，由 Root 检查证据 |
 | `delegated` | 本地 agy 在独立 Worktree 完成边界明确的实现与测试 |
 | `approval_required` | 架构、安全、迁移、部署或其他高风险任务先审批再委派 |
 
@@ -49,6 +49,14 @@ python .ai/scripts/control.py collect TASK-001
 原 ai.py 和 delegate.py 暂时保留为兼容入口，新使用方式统一采用 control.py。
 
 ## 在 Codex 中使用
+
+仓库提供 Plus 项目级配置：Luna max 主控、Luna medium 原生执行、Astra low
+独立审查。Root 可以在原生 worker 与 Antigravity 两种实现路径间选择，仍使用同一套
+`.ai/` 契约与风险门。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
+详见 [混合执行指南](docs/HYBRID_ORCHESTRATION.md)。
+
+使用 Python 3.11+ 执行 `python .ai/scripts/control.py check-orchestration` 可检查
+项目配置一致性；这不代表已验证实际模型路由、额度或沙箱执行。
 
 仓库内置可发现技能：.agents/skills/antigravity-delegate。在当前仓库的
 Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执行、回执收集、
@@ -87,4 +95,4 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 - [当前限制](docs/LIMITATIONS.md)
 - [用量测量](COST_METRICS.md)
 
-当前版本：**3.1.4-local**。
+当前版本：**3.2.0-local**。

@@ -1,17 +1,5 @@
-# Closeout Workflow
+# 收尾
 
-For PASS / PASS_WITH_NOTES:
-
-1. confirm required human approval for high-risk tasks;
-2. transition task to DONE;
-3. update `PROJECT_STATE.yaml`;
-4. update ROADMAP status;
-5. update durable memory/ADR/API surface when relevant;
-6. merge/integrate according to repository policy;
-7. archive later when no longer needed in active history.
-
-For REWORK:
-
-- increment attempt;
-- preserve prior receipts/findings;
-- transition back to READY, or create a separate fix task if remediation is independently reviewable.
+遵循[统一控制流程：收尾](../../docs/CONTROL_WORKFLOW.md#4-收尾)。
+Root 协调项目状态并显式集成已审查提交。
+REWORK 只执行一次 REVIEW 到 READY，控制器自动归档回执并增加 attempt。

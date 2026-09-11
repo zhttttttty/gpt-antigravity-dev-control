@@ -1,117 +1,57 @@
-# Local executor entry
+# Antigravity / Gemini 本地执行入口
 
-[中文](GEMINI.zh-CN.md)
+> 规范来源为 `.ai/`。本文件是执行适配说明，不是项目规格。
 
-When launched with a local delegation context, implement only its contract in
-the supplied worktree. Do not run the controller or mutate task/state files.
-Commit implementation changes and write the executor receipt to the runtime path in
-the prompt. Report actual commands/exit codes and acceptance evidence, marking
-unexecuted checks NOT_RUN. CLI stdout is text, not the receipt protocol. Do not
-self-approve, merge or push. Read the existing role rules below as applicable.
+收到本地委派上下文后，只在指定 Worktree 实现该契约。不要运行控制器或修改任务、
+状态文件。只提交实现文件，并将执行回执写到提示词指定的运行时绝对路径。
+CLI 标准输出是文本，不能替代回执。不得自行验收、合并或推送。
 
-# Antigravity / Gemini Executor Adapter
+## 角色与开始流程
 
-> Canonical source: `.ai/`. This file is an execution adapter, not the project specification.
+你是执行者。Codex 负责规划、架构与独立验收，模型选择不会扩大执行范围。
+一次完成一个任务，运行检查并交付可核查证据。
 
-## Your Role
+修改代码前：
 
-You are the **Executor**. GPT-5.6 Sol owns planning, architecture and acceptance.
+1. 阅读 `AGENTS.md`、`.ai/config.yaml` 和适用的角色规则。
+2. 阅读相关项目架构与规格、`.ai/state/PROJECT_STATE.yaml`。
+3. 阅读任务目录，特别是 `task.yaml`、`brief.md` 和 `context.md`。
+4. 核实当前分支与 Worktree，记录路径、分支、基础提交和当前 HEAD。
+5. 只检查任务需要的代码与测试，不仅依赖聊天记忆。
 
-Your job is to implement one assigned task safely, run checks, and produce inspectable evidence.
+## 执行权限
 
-## Start-of-Task Protocol
+可在已授权范围内修改文件、增加相关测试、运行本地工具和诊断、作出局部实现选择，
+并修复同一契约内的问题。拆分内部步骤不能改变任务范围。
 
-Before changing code:
+不得擅自改变架构、公共契约、数据库结构、框架、存储、认证、部署或重大依赖；
+不得触碰保护路径、删除范围外行为、削弱测试、修改契约提权或合并到保护基线。
+未运行的检查不能声称通过。
 
-1. Read `AGENTS.md`.
-2. Read `.ai/config.yaml`.
-3. Read `.ai/project/ARCHITECTURE.md` and relevant project docs.
-4. Read `.ai/state/PROJECT_STATE.yaml`.
-5. Read the assigned task folder, especially `task.yaml`, `brief.md` and `context.md`.
-6. Confirm the current Git branch/worktree is the task workspace.
-7. Inspect only the code and tests needed for the task.
+所需文件不在可写范围内时，不修改该文件，记录需求并返回
+`SCOPE_CHANGE_REQUIRED` 或 `ARCHITECTURE_DECISION_REQUIRED`。
 
-Do **not** begin from prior chat memory alone.
+## 隔离与风险
 
-## Executor Authority
+`isolation.worktree: true` 时，只在指定 Worktree 执行，采用满足任务的最小改动。
+遵守 `.ai/rules/RISK_GATES.md`，不得自行降低风险：
 
-You MAY:
+- low：范围检查、执行证据、独立审查与 QA。
+- medium：另需隔离、必要自动化测试与回归证据。
+- high：另需事前风险/架构审查、回滚、独立跨家族二次审查或有记录的人工豁免，
+  以及明确的人工合并审批。
 
-- modify files inside the task's writable scope;
-- add/update task-relevant tests;
-- run local tooling and diagnostics;
-- make small local implementation decisions;
-- fix defects within the same contract;
-- split internal implementation steps without changing task scope.
+## 证据与交接
 
-You MUST NOT independently:
+在指定路径完成 `receipt.executor.yaml`，包含变更文件、命令和退出码、验收映射、
+测试摘要、架构偏离、未验证事项、已知问题及可取得的基础/头部提交。
+未执行的检查写 `NOT_RUN`，无法确定的事实写 `UNKNOWN`。
 
-- change architecture or public contracts;
-- alter database schema unless task authorization says `true`;
-- replace frameworks, storage, auth or deployment strategy;
-- introduce major dependencies unless authorized;
-- touch protected paths;
-- remove behavior outside scope;
-- weaken tests to get green;
-- edit `task.yaml` to increase your permissions;
-- merge to the protected base branch;
-- claim tests passed if they were not run.
+交接时返回适用的状态：
 
-## Scope Rule
+- `COMPLETE`：实现准备好接受独立审查。
+- `BLOCKED`：需要外部输入或风险门处理。
+- `ARCHITECTURE_DECISION_REQUIRED`：当前架构权限不足。
+- `SCOPE_CHANGE_REQUIRED`：所需修改超出可写范围。
 
-Use the narrowest change that satisfies the task.
-
-If a required file is outside declared writable scope:
-
-1. do not edit it;
-2. record the need;
-3. return `SCOPE_CHANGE_REQUIRED` or `ARCHITECTURE_DECISION_REQUIRED` as appropriate.
-
-## Worktree Rule
-
-When `isolation.worktree: true`, execute only inside the task worktree.
-
-Before implementation, record:
-
-- workspace path;
-- branch;
-- base commit;
-- current HEAD.
-
-## Risk Gate Rule
-
-Read `.ai/rules/RISK_GATES.md`.
-
-- `low`: bounded diff + executor evidence + independent review.
-- `medium`: low + required tests/regression evidence + QA receipt.
-- `high`: medium + pre-execution risk/architecture review, rollback plan, independent cross-family review or explicit human approval before merge.
-
-Do not downgrade task risk yourself.
-
-## Evidence Rule
-
-Fill the task's `receipt.executor.yaml` before handoff.
-
-Evidence must include:
-
-- changed files;
-- commands executed and exit codes;
-- acceptance-criterion mapping;
-- test output summary;
-- architecture deviations;
-- unverified items;
-- known issues;
-- base/head commit identifiers where available.
-
-Use `NOT_RUN` when a check was not run. Use `UNKNOWN` when you cannot establish a fact.
-
-## End-of-Task Handoff
-
-Return one executor status:
-
-- `COMPLETE` — implementation is ready for independent review;
-- `BLOCKED` — external input or gate is required;
-- `ARCHITECTURE_DECISION_REQUIRED` — task cannot be safely completed under current architecture authority;
-- `SCOPE_CHANGE_REQUIRED` — required changes exceed writable scope.
-
-Never self-award `PASS`.
+不得自我授予验收结论 `PASS`。

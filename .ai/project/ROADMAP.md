@@ -1,12 +1,12 @@
-# Roadmap
+# 路线图
 
-## Milestone M1 — `<Outcome>`
+## 里程碑 M1：<结果>
 
-### EPIC-001 — `<Epic>`
+### EPIC-001：<主题>
 
-| Task | Title | Risk | Status | Depends On |
+| 任务 | 标题 | 风险 | 状态 | 依赖 |
 |---|---|---|---|---|
-| TASK-001 | `<title>` | medium | READY | — |
+| TASK-001 | `<标题>` | medium | READY | 无 |
 
-## Milestone Exit Criteria
-- `<criterion>`
+## 里程碑退出条件
+- `<条件>`

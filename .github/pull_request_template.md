@@ -1,33 +1,29 @@
-<!-- 中文模板：pull_request_template.zh-CN.md -->
+## 变更内容
 
-## What changed
+<!-- 概括本次边界明确的变更。 -->
 
-<!-- Summarize the bounded change. -->
+## 原因
 
-## Why
+<!-- 说明问题或需求。 -->
 
-<!-- Explain the problem or requirement. -->
+## 影响层
 
-## Layer
+- [ ] 核心任务协议
+- [ ] 本地委派
+- [ ] Executor Adapter
+- [ ] 文档 / 示例
 
-- [ ] Core Protocol
-- [ ] Local delegation
-- [ ] Local executor adapter
-- [ ] Documentation / examples
+## 兼容性与风险
 
-## Compatibility / risk
+<!-- 说明任务 Schema、状态机、Receipt、Risk Gate 或迁移影响。 -->
 
-<!-- Note task schema, state machine, receipt, Risk Gate or migration impact. -->
+## 证据
 
-## Evidence
+- [ ] Python 编译通过
+- [ ] YAML 解析通过
+- [ ] 相关 CLI / 测试已运行
+- [ ] 未包含秘密
 
-- [ ] Python compiles
-- [ ] YAML parses
-- [ ] Relevant CLI / tests run
-- [ ] No secrets included
+命令与结果：
 
-Commands / results:
-
-```text
-<evidence>
-```
+    <evidence>

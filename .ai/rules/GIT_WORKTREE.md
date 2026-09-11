@@ -1,35 +1,22 @@
-# Git Worktree Isolation
+# Git Worktree 隔离
 
-Each medium/high-risk implementation task should use its own worktree.
+中高风险实现任务必须使用独立 Worktree；低风险按契约要求隔离。
+direct 默认目录为 `.worktrees/TASK-001/`，分支为 `ai/TASK-001`；
+agy 的目录和分支以 prepare 返回结果为准。
 
-Default layout:
+## 规则
 
-```text
-repo/
-├─ .git/
-├─ .worktrees/
-│  └─ TASK-001/
-└─ ...
-```
+1. 从预期基线创建；控制器要求干净工作区，完整契约已提交，配置基线等于 HEAD。
+2. 不依赖基线工作区未提交内容，不静默回退到其他基线。
+3. 执行回执记录 Worktree、分支与基础提交。
+4. 测试、审查和合并针对同一 Worktree 的精确版本。
+5. 保留必要证据并确认安全集成或放弃后，才能清理 Worktree。
 
-Default branch:
+## 状态归属
 
-```text
-ai/TASK-001
-```
+direct/native 与 agy 的活动任务均归主控仓库。Worktree 中的任务文件是已提交契约快照，
+不能视作第二个活动队列，也不能在集成时覆盖主控的新状态。
+生命周期命令在主控目录运行，或明确指定 `--repo`。
 
-Rules:
-
-1. Create from the intended base commit/branch.
-2. Do not rely on uncommitted changes in the base workspace.
-3. Record base commit and branch in the executor receipt.
-4. Run tests in the same worktree whose diff is reviewed.
-5. Review/merge the exact commit range produced by the task.
-6. Remove worktree only after evidence is preserved and the task is safely integrated or abandoned.
-
-## Branch-Local State Note
-
-With the lightweight helper, an active task's folder/status transition occurs inside the task worktree/branch. The base branch therefore retains the last integrated task state until that task branch is accepted and integrated. This is intentional for direct/manual execution.
-
-The control plane keeps scheduling explicit and local. Do not run two controllers against the
-same task/worktree; inspect and resolve any stale local run record before retrying.
+同一任务或 Worktree 不允许两个控制器。重试前检查残留运行记录、进程与部分修改。
+旧版分支内活动状态的协调方法见[统一控制流程](../../docs/CONTROL_WORKFLOW.md#恢复)。

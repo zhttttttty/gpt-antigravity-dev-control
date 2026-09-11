@@ -1,19 +1,12 @@
-# Architecture Gate
+# 架构门
 
-Stop implementation if the task requires an unauthorized change to:
+任务要求以下未经授权的变更时停止实现：
 
-- database schema / migrations;
-- public API or event contract;
-- authentication / authorization;
-- secrets, cryptography or trust boundary;
-- core framework/runtime/storage engine;
-- deployment topology;
-- external service;
-- persistent state or queue semantics;
-- major dependency;
-- backward compatibility contract;
-- broad cross-module architecture.
+- 数据库结构、迁移、公共 API 或事件契约。
+- 认证、授权、秘密、加密或信任边界。
+- 核心框架、运行时、存储引擎。
+- 部署拓扑、外部服务、持久状态或队列语义。
+- 重大依赖、兼容性契约或大范围跨模块架构。
 
-Required artifact: accepted ADR or explicit task authorization.
-
-Escalation token: `ARCHITECTURE_DECISION_REQUIRED`.
+必要文件：已接受的 ADR 或明确任务授权。
+升级标识：`ARCHITECTURE_DECISION_REQUIRED`。

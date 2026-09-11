@@ -1,47 +1,50 @@
-# Architecture
+# 项目架构
 
-## Architecture Summary
-`<one-paragraph system description>`
+## 架构概述
+`<用一段话描述系统>`
 
-## System Context
-`<actors, external systems, boundaries>`
+## 系统上下文
+`<参与者、外部系统和边界>`
 
-## Components
-| Component | Responsibility | Interface | Persistent State |
+## 组件
+| 组件 | 职责 | 接口 | 持久状态 |
 |---|---|---|---|
-| `<name>` | `<role>` | `<API/event/file>` | `<yes/no + where>` |
+| `<名称>` | `<职责>` | `<API/事件/文件>` | `<有无及位置>` |
 
-## Data Flow
-`<main request/event/data flow>`
+## 数据流
+`<主要请求、事件和数据流>`
 
-## Public Contracts
-- `<API / CLI / file schema / event>`
+## 公共契约
+- `<API/CLI/文件格式/事件>`
 
-## Data Model / Persistence
-- `<storage and schema principles>`
+## 数据模型与持久化
+- `<存储与结构原则>`
 
-## Security Boundaries
-- `<auth, secrets, trust boundaries>`
+## 安全边界
+- `<认证、秘密和信任边界>`
 
-## Deployment / Runtime
-- `<runtime topology>`
+## 部署与运行
+- `<运行拓扑>`
 
-## Error Handling / Recovery
-- `<failure behavior>`
+## 错误处理与恢复
+- `<故障行为>`
 
-## Observability
-- `<logs, metrics, traces>`
+## 可观测性
+- `<日志、指标和追踪>`
 
-## Performance / Scaling Assumptions
-- `<assumptions>`
+## 性能与扩展假设
+- `<假设>`
 
-## Architecture Invariants
-These cannot change without an accepted ADR / explicit architecture approval.
+## 架构不变量
 
-- `ARCH-INV-001: <invariant>`
+没有已接受 ADR 或明确架构授权时，不得修改：
 
-## Protected Areas
-- `<path or subsystem>`
+- `ARCH-INV-001: <不变量>`
 
-## Architecture Gate
-Changes affecting schema, public contracts, security, core frameworks, deployment, external services or persistent-state semantics require an ADR before implementation.
+## 保护区域
+- `<路径或子系统>`
+
+## 架构门
+
+影响数据库结构、公共契约、安全、核心框架、部署、外部服务或持久状态语义的修改，
+必须在实现前记录 ADR。

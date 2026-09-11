@@ -1,20 +1,20 @@
-# Requirements
+# 需求
 
-Use stable IDs so tasks and tests can reference requirements.
+使用稳定编号，便于任务和测试引用。
 
-## Functional Requirements
+## 功能需求
 
-### FR-001 — `<Title>`
-**Requirement:** `<statement>`
+### FR-001：<标题>
+**需求：** `<描述>`
 
-**Acceptance signal:** `<observable result>`
+**验收信号：** `<可观察结果>`
 
-## Non-Functional Requirements
+## 非功能需求
 
-### NFR-001 — `<Title>`
-**Requirement:** `<performance/security/reliability/compatibility requirement>`
+### NFR-001：<标题>
+**需求：** `<性能、安全、可靠性或兼容性要求>`
 
-## Constraints / Invariants
+## 约束与不变量
 
-### INV-001 — `<Title>`
-`<must remain true>`
+### INV-001：<标题>
+`<必须始终成立的条件>`

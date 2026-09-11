@@ -1,12 +1,25 @@
-# Failure recovery
+# 故障恢复
 
-Recover from the first concrete failure instead of looping:
+## 本地 agy
 
-1. Invalid or unsupported argument: stop, re-run the capability probe, and remap only to advertised flags.
-2. Worktree path mismatch: discard guessed paths and read the path returned by `git worktree list --porcelain` or `create_review_worktree.ps1`.
-3. Permission or terms prompt: keep the session interactive; do not infer login or consent from a successful help command.
-4. Concurrent session failure: the launcher retries at most once, reduces effective concurrency to one, and preserves the first attempt's logs. A second failure is final.
-5. Truncated stdout or missing report: use the fixed report path and session registry; never treat an exit code alone as success.
-6. Dirty cleanup: refuse removal without explicit `-Force`; inspect the diff before any forced cleanup.
+从首个具体故障恢复，避免循环尝试：
 
-Every retry receives a new attempt number and keeps the previous execution log. Do not start a second controller for the same task, silently replace Antigravity with an ordinary Codex subtask, or merge without the independent review contract.
+1. 参数无效或不支持：停止，重新探测，仅映射帮助中支持的参数。
+2. Worktree 路径不符：读取 `git worktree list --porcelain` 或创建脚本返回的路径。
+3. 权限或条款提示：保持交互，不从帮助命令成功推断登录或同意。
+4. 并发失败：最多重试一次，降为单并发，保留首次日志；再次失败即停止。
+5. stdout 截断或报告缺失：检查固定报告路径与会话登记，不能仅凭退出码判定成功。
+6. 清理脏目录：没有明确 `-Force` 不移除；强制清理前检查 Diff。
+
+每次重试使用新尝试编号并保留旧日志。不要为同一任务启动第二个控制器，
+静默用普通 Codex 子任务替代 Antigravity，或绕过独立审查合并。
+
+## 原生故障与重新分配
+
+原生工具不可用时如实报告，不模拟派发或仅凭配置声称使用了某模型。
+保留失败代理身份，检查状态、输出和部分修改；活动未知时禁止新增写入，
+待工作完成或停止后再重新分配。
+
+Root 可在记录原因、保留证据、按 revision/attempt 规则更新契约后选择可用后端。
+使用隔离工作区并遵守新后端审批协议。不要为原生任务生成 agy 运行记录、
+清空历史获取重试次数或让原生 worker 启动 agy。验收前重新验证变更后的快照。

@@ -1,12 +1,5 @@
-# Execution Workflow
+# 执行
 
-1. Validate task contract.
-2. Create/enter task worktree when required.
-3. Record base commit/workspace.
-4. Start fresh executor context.
-5. Read only relevant context.
-6. Implement the smallest compliant change.
-7. Run required checks.
-8. Fill executor receipt.
-9. Transition to REVIEW.
-10. Stop; do not self-approve or merge protected branch.
+遵循[统一控制流程：执行](../../docs/CONTROL_WORKFLOW.md#2-执行)。
+文件归属、Worktree、快照交接和合计容量见[编排规则](../rules/ORCHESTRATION.md)。
+仅 Root 管理任务状态。

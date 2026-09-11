@@ -1,40 +1,82 @@
 ---
 name: antigravity-delegate
-description: "Decide whether to delegate bounded coding, review, testing, refactoring, or repository-analysis work to the locally installed Antigravity CLI in an isolated Git worktree, then control and verify that execution. Use automatically when a multi-file task has clear scope and command-verifiable acceptance criteria; keep small or tightly interactive work in Codex, and require approval before high-risk delegation."
+description: "在原生 Codex 角色与本地 Antigravity CLI 之间分配有界开发任务并核验契约证据。适用于独立执行或原生/本地混合协作；简单修改直接处理。"
 ---
 
-# Antigravity delegation controller
+# 原生与 Antigravity 委派控制
 
-Codex owns planning, routing, scope, acceptance, and independent verification. This Skill supplies a deterministic local execution protocol; it is not a remote scheduler and it must not silently replace ordinary Codex subtasks.
+Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供确定性的本地执行协议，
+不是远程调度器，也不能静默替换普通 Codex 子任务。
 
-## Decide whether to delegate
+## 混合执行
 
-Codex may select this Skill automatically. State the routing decision before starting Antigravity.
+选择或混用后端时阅读[编排规则](../../../.ai/rules/ORCHESTRATION.md)。
+使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
+默认 Luna max 主控、Luna medium 原生执行、Astra low 独立审查。
+用户或运行时的明确选择优先，报告实际使用情况。
 
-- Use `direct` for small edits, short documentation/configuration changes, ambiguous exploration, or work that needs continuous interactive reasoning.
-- Use `delegated` for bounded multi-file implementation, test completion, independent refactoring, or repository review with command-verifiable acceptance criteria.
-- Use `approval_required` before delegating architecture, authentication, security, migration, deployment, billing, destructive, or otherwise high-risk changes.
-- Keep work direct when capability probing fails or delegation setup/review overhead is likely to exceed implementation effort.
+按范围和协调成本选择 Root 直接执行、原生 Codex 或本地 agy。
+原生任务使用真实 `spawn_agent` 和 direct 协议，agy 使用 `control.py`；
+不要仅为转发 agy 启动原生代理，也不要对原生任务套用 agy 的 launch/collect。
 
-Automatic Skill selection authorizes planning and read-only capability probing only. Obtain the task's required approval immediately before mutation, permission bypass, or other gated execution.
+仅 Root 管理派发，提供契约、文件归属、精确 Worktree/版本、检查项和回执路径。
+原生与 agy 合计默认两个执行单元，由协调者管理，没有跨运行时硬锁。
+同一 Worktree 只有一个写入者，实现、测试和审查针对同一快照。
+返回精简证据和完整日志路径，如实报告不可用工具、失败与替代路径。
 
-## Required protocol
+## 选择本地执行
 
-1. Probe the actual executable before every run:
+Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
+
+- `direct`：小型修改、简短文档或配置、边界未明确的探索，或需要持续交互推理的工作。
+- `delegated`：有界多文件实现、补充测试、独立重构或可通过命令核验的仓库审查。
+- `approval_required`：架构、认证、安全、迁移、部署、计费、破坏性或其他高风险工作。
+- 探测失败或准备与审查成本可能超过实现成本时，保持直接执行。
+
+自动选择 Skill 本身仅授权规划与只读探测。变更、权限绕过或受控执行前，落实任务
+要求的审批；已有明确用户授权按当前会话范围适用。
+
+## 本地协议
+
+1. 每次运行前探测实际可执行文件：
 
        powershell -NoProfile -ExecutionPolicy Bypass -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
 
-   Read `capabilities.json`. Do not assume a flag, mode, login state, or agent-list command. The controller routes `direct`, `delegated`, and `approval_required` are not `agy --mode` values. Map full access to omitted `--sandbox`, automatic approval to `--dangerously-skip-permissions`, read-only review to `--mode plan`, and implementation to an advertised edit mode. Full access never expands the task contract.
-2. Create isolation with `create_review_worktree.ps1`. Read its JSON path and branch instead of guessing temporary paths. Refuse a dirty base unless the task explicitly allows it.
-3. For one task, use the repository control CLI. For several bounded shards, read [the coordination protocol](references/coordination-protocol.md), define an acyclic `depends_on` graph, and call `launch_agents.ps1`. Keep the default of two for mixed or writing work. For at least four independent read-only shards, Codex may request three or four; the launcher starts at two and ramps up only after a successful completion. Use separate worktrees for independent writers. The launcher enforces single-writer worktree access, retries at most once, and lowers concurrency to one after the first failure.
-4. Use a fixed output directory. The launcher writes `sessions.json`, one report per agent, stderr, execution logs, and the capability record. Call `collect_reports.ps1` and read its compact summary before opening full evidence.
-5. Apply the independent Codex review contract: verify all P0/P1 paths and lines, run tests, check acceptance and coverage counts, classify findings as confirmed/conditional/hypothesis, and verify the worktree state. Collection is never an automatic merge or DONE transition.
-6. Clean only through `cleanup_worktree.ps1`; removal is allowed only when the worktree is clean unless an explicit forced cleanup is approved.
+   读取 `capabilities.json`，不要假设参数、模式、登录或代理列表命令可用。
+   控制器路由不是 `agy --mode`。全访问映射为省略 `--sandbox`；
+   自动批准对应 `--dangerously-skip-permissions`；只读审查用 `--mode plan`，
+   实现使用帮助中确认的编辑模式。全访问不会扩大契约。
+2. 单任务生命周期用 `control.py prepare` 创建 Worktree；
+   独立审查分片用 `create_review_worktree.ps1`，不要为同次执行创建两套目录。
+   使用返回的路径和分支。脏基线须按任务授权处理，不能自行假定允许。
+3. 单任务使用统一 CLI；多个有界分片阅读[协作协议](references/coordination-protocol.md)，
+   定义无环 `depends_on` 图并调用 `launch_agents.ps1`。扣除原生任务已占容量；
+   三到四个 agy 分片须先显式协调项目预算。启动器从两个开始，成功后才扩容。
+   独立写入使用独立 Worktree；本地启动器只约束自身任务，最多重试一次，首次失败后降为单并发。
+4. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
+   先运行 `collect_reports.ps1` 阅读摘要，再按需打开完整证据。
+5. 独立核验全部 P0/P1 的路径行号、测试、验收和覆盖计数及 Worktree 状态，
+   将发现标记为确认、条件成立或假设。收集不会自动合并或迁入 DONE。
+6. 使用 `cleanup_worktree.ps1` 清理；只有干净 Worktree 可移除，强制清理需明确批准。
 
-## Repository entry point
-
-For normal task lifecycle operations, use:
+## 仓库入口
 
     python .ai/scripts/control.py <command>
 
-Read [execution modes](references/execution-modes.md), [review contract](references/review-contract.md), and [failure recovery](references/failure-recovery.md) when those phases apply. The existing [task protocol](references/task-protocol.md), [receipt protocol](references/receipt-protocol.md), and [Codex workflow](references/codex-workflow.md) define the repository state machine and compact receipt format.
+用 `create TASK-ID --title ... --objective ...` 生成任务，补齐并验证契约。
+创建 Worktree 前提交契约，基线必须等于 HEAD。状态命令在主控仓库执行，
+Worktree 内任务文件为快照。原生/direct 证据经 Root 写入输出的主控回执路径。
+DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
+
+按当前阶段阅读[统一控制流程](../../../docs/CONTROL_WORKFLOW.md)、
+[执行模式](references/execution-modes.md)、[审查契约](references/review-contract.md)
+或[故障恢复](references/failure-recovery.md)；状态和回执说明见
+[任务协议](references/task-protocol.md)、[回执协议](references/receipt-protocol.md)
+与[Codex 流程](references/codex-workflow.md)。
+
+修改配置默认值后运行 `control.py check-orchestration`，它只检查仓库一致性。
+实际模型和角色以运行证据为准，不能由 TOML 推断。保留 Skill 名称，兼容
+`$antigravity-delegate` 调用。
+
+本 Skill 依赖目标仓库的 `.ai/` 控制平面。安装在仓库外时，从目标仓库解析这些引用，
+而非全局 Skill 目录。协议或入口缺失时报告前置条件，不静默生成或安装。

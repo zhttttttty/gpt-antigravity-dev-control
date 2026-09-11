@@ -1,13 +1,5 @@
-# Recovery / Resume Workflow
+# 恢复
 
-A fresh session recovers from artifacts, not transcript memory.
-
-Read:
-
-1. `.ai/state/PROJECT_STATE.yaml`;
-2. active/review/blocked task folders;
-3. task receipts and review history;
-4. Git worktrees/branches/commits;
-5. relevant ADRs/memory.
-
-If artifact state conflicts with Git reality, stop and reconcile before continuing.
+遵循[统一控制流程：恢复](../../docs/CONTROL_WORKFLOW.md#恢复)。
+分配新写入者前检查代理或进程状态与部分修改。
+快照协调见[编排规则](../rules/ORCHESTRATION.md)。

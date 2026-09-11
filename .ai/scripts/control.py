@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import runpy
+import subprocess
 import sys
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CORE_COMMANDS = {
+    "create",
     "validate",
     "transition",
     "start",
@@ -31,9 +33,11 @@ HELP = """usage: control.py [--repo PATH] COMMAND [ARGS...]
 Unified local AI development control plane.
 
 Task protocol commands:
+  check-orchestration            check native/canonical config agreement offline
   status                         list task states
+  create TASK --title ... --objective ... [--risk low] [--mode direct]
   validate TASK                 validate a task contract
-  start TASK [--worktree]       start a direct/manual task
+  start TASK [--worktree] [--approval-file PATH]
   transition TASK STATE         apply a reviewed state transition
   worktree-create TASK          create a protocol worktree
   worktree-remove TASK [--force]
@@ -43,7 +47,7 @@ Local delegation commands:
   route TASK                    resolve execution.mode
   prepare TASK --approve        prepare an isolated delegation attempt
   launch TASK --approve [...]   launch agy in the prepared worktree
-  status TASK                   show the latest delegation run
+  status TASK                   show task state and any local delegation run
   diagnose TASK                 classify a stopped/failed run
   collect TASK                  validate and collect executor evidence
 
@@ -74,6 +78,8 @@ def parse_global(argv: list[str]) -> tuple[Path, list[str]]:
 
 def target_for(arguments: list[str]) -> Path:
     command = arguments[0]
+    if command == "check-orchestration":
+        return SCRIPT_DIR / "check_orchestration.py"
     if command == "status":
         # `status` lists protocol state with no task and shows delegation state
         # when a task identifier is supplied.
@@ -118,8 +124,10 @@ def main(argv: list[str] | None = None) -> int:
         repo = repo.expanduser().resolve()
         if not repo.is_dir():
             raise ValueError(f"repository path is not a directory: {repo}")
-        return run_entry(target_for(arguments), arguments, repo)
-    except ValueError as exc:
+        entry = target_for(arguments)
+        entry_args = arguments[1:] if arguments[0] == "check-orchestration" else arguments
+        return run_entry(entry, entry_args, repo)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         print("Run control.py --help for usage.", file=sys.stderr)
         return 2

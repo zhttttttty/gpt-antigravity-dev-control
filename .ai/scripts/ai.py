@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from task_data import (read_yaml, write_yaml, parse_yaml, task_id as checked_id,
+                       done_errors, require_approval)
 
 STATES = {
     "READY": ".ai/tasks/queue",
@@ -50,6 +52,7 @@ def now():
 
 
 def task_locations(root, task_id):
+    checked_id(task_id)
     out = []
     for state, rel in STATES.items():
         p = root / rel / task_id
@@ -71,73 +74,29 @@ def read_text(path):
     return path.read_text(encoding="utf-8")
 
 
-def clean_scalar(value):
-    return value.strip().strip("\"'")
-
-
 def top_scalar(src, key):
-    m = re.search(rf"(?m)^{re.escape(key)}:\s*([^#\n]+?)\s*$", src)
-    return clean_scalar(m.group(1)) if m else None
+    return parse_yaml(src).get(key)
 
 
 def nested_scalar(src, section, key):
-    lines = src.splitlines()
-    sec_i = None
-    sec_indent = 0
-    for i, line in enumerate(lines):
-        m = re.match(r"^(\s*)" + re.escape(section) + r":\s*$", line)
-        if m:
-            sec_i = i
-            sec_indent = len(m.group(1))
-            break
-    if sec_i is None:
-        return None
-    for line in lines[sec_i + 1:]:
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip())
-        if indent <= sec_indent:
-            break
-        m = re.match(r"^\s*" + re.escape(key) + r":\s*([^#\n]+?)\s*$", line)
-        if m:
-            return clean_scalar(m.group(1))
-    return None
+    value = parse_yaml(src).get(section)
+    return value.get(key) if isinstance(value, dict) else None
 
 
 def replace_top(path, key, value):
-    src = read_text(path)
-    pat = re.compile(rf"(?m)^({re.escape(key)}:\s*).*$")
-    if not pat.search(src):
+    data = read_yaml(path)
+    if key not in data:
         raise SystemExit(f"ERROR: missing top-level key '{key}' in {path}")
-    src = pat.sub(lambda m: f"{m.group(1)}{value}", src, count=1)
-    path.write_text(src, encoding="utf-8")
+    data[key] = value
+    write_yaml(path, data)
 
 
 def replace_nested(path, section, key, value):
-    lines = read_text(path).splitlines()
-    sec_i = None
-    sec_indent = 0
-    for i, line in enumerate(lines):
-        m = re.match(r"^(\s*)" + re.escape(section) + r":\s*$", line)
-        if m:
-            sec_i = i
-            sec_indent = len(m.group(1))
-            break
-    if sec_i is None:
-        raise SystemExit(f"ERROR: missing section '{section}' in {path}")
-    for i in range(sec_i + 1, len(lines)):
-        line = lines[i]
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip())
-        if indent <= sec_indent:
-            break
-        m = re.match(r"^(\s*)" + re.escape(key) + r":", line)
-        if m:
-            lines[i] = f"{m.group(1)}{key}: {value}"
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            return
-    raise SystemExit(f"ERROR: missing nested key '{section}.{key}' in {path}")
+    data = read_yaml(path)
+    if not isinstance(data.get(section), dict) or key not in data[section]:
+        raise SystemExit(f"ERROR: missing nested key '{section}.{key}' in {path}")
+    data[section][key] = value
+    write_yaml(path, data)
 
 
 def validate_task(root, task_id, quiet=False):
@@ -147,35 +106,75 @@ def validate_task(root, task_id, quiet=False):
     if not y.exists():
         errors.append("missing task.yaml")
     else:
-        src = read_text(y)
+        try:
+            data = read_yaml(y)
+        except (ValueError, OSError) as exc:
+            if not quiet:
+                print(f"INVALID {task_id}: {exc}")
+            return False
         for key in ["schema_version", "id", "title", "status", "contract_revision", "attempt", "objective"]:
-            if top_scalar(src, key) is None:
+            if not data.get(key):
                 errors.append(f"missing top-level key: {key}")
-        actual_id = top_scalar(src, "id")
-        status = top_scalar(src, "status")
-        risk = nested_scalar(src, "planning", "risk")
-        worktree = nested_scalar(src, "isolation", "worktree")
+        for key in ("schema_version", "contract_revision", "attempt"):
+            if type(data.get(key)) is not int or data[key] < 1:
+                errors.append(f"{key} must be a positive integer")
+        if data.get("schema_version") != 2:
+            errors.append("schema_version must be 2")
+        sections = ["planning", "roles", "scope", "authority", "isolation", "checks", "risk_controls", "artifacts", "metadata"]
+        for section in sections:
+            if not isinstance(data.get(section), dict):
+                errors.append(f"missing/invalid mapping: {section}")
+        if any(not isinstance(data.get(section), dict) for section in sections):
+            if not quiet:
+                print(f"INVALID {task_id}: " + "; ".join(errors))
+            return False
+        actual_id = data.get("id")
+        status = data.get("status")
+        risk = data["planning"].get("risk")
+        worktree = data["isolation"].get("worktree")
         if actual_id and actual_id != task_id:
             errors.append(f"task id mismatch: folder={task_id}, task.yaml={actual_id}")
-        if status and status not in STATES:
+        if not isinstance(status, str) or status not in STATES:
             errors.append(f"invalid status: {status}")
         if status and status != folder_state:
             errors.append(f"folder/status mismatch: folder={folder_state}, task.yaml={status}")
-        if risk not in RISK:
+        if not isinstance(risk, str) or risk not in RISK:
             errors.append(f"invalid/missing planning.risk: {risk}")
-        if risk in {"medium", "high"} and str(worktree).lower() != "true":
+        if risk in ("medium", "high") and worktree is not True:
             errors.append(f"{risk} risk requires isolation.worktree: true")
-        for section in ["planning", "roles", "scope", "authority", "isolation", "acceptance", "checks", "risk_controls", "artifacts", "metadata"]:
-            if not re.search(rf"(?m)^{re.escape(section)}:\s*$", src):
-                errors.append(f"missing section: {section}")
         for key in ["planner", "executor", "reviewer"]:
-            if nested_scalar(src, "roles", key) is None:
+            if not isinstance(data["roles"].get(key), str) or not data["roles"][key].strip():
                 errors.append(f"missing roles.{key}")
-        if not re.search(r"(?m)^\s+-\s+id:\s*AC-", src):
-            errors.append("at least one acceptance item with id AC-* is required")
+        acceptance = data.get("acceptance")
+        if not isinstance(acceptance, list) or not acceptance or not all(
+                isinstance(item, dict) and isinstance(item.get("id"), str)
+                and item["id"].startswith("AC-") and item.get("criterion") and item.get("evidence")
+                for item in acceptance):
+            errors.append("acceptance requires AC-* items with criterion/evidence")
+        elif len({item["id"] for item in acceptance}) != len(acceptance):
+            errors.append("acceptance IDs must be unique")
+        required = data["checks"].get("required")
+        if not isinstance(required, list) or not all(isinstance(item, dict) and
+                isinstance(item.get("command"), str) and item["command"].strip() for item in required):
+            errors.append("checks.required must contain command mappings")
+        for section in ("authority", "risk_controls"):
+            if any(type(value) is not bool for value in data[section].values()):
+                errors.append(f"{section} values must be booleans")
+        if type(worktree) is not bool:
+            errors.append("isolation.worktree must be boolean")
+        execution = data.get("execution", {})
+        if not isinstance(execution, dict) or execution.get("mode", "direct") not in ("direct", "delegated", "approval_required"):
+            errors.append("invalid execution.mode")
+        for key in ("writable", "protected"):
+            values = data["scope"].get(key)
+            if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
+                errors.append(f"scope.{key} must be a list of paths")
+        dependencies = data["planning"].get("depends_on", [])
+        if not isinstance(dependencies, list) or not all(isinstance(value, str) for value in dependencies):
+            errors.append("planning.depends_on must be a list of task IDs")
         if risk == "high":
             for key in ["rollback_plan_required", "cross_family_review_required", "human_merge_approval_required"]:
-                if str(nested_scalar(src, "risk_controls", key)).lower() != "true":
+                if data["risk_controls"].get(key) is not True:
                     errors.append(f"high risk requires risk_controls.{key}: true")
     for f in ["brief.md", "context.md", "receipt.executor.yaml", "receipt.qa.yaml", "review.yaml", "rollback.md"]:
         if not (p / f).exists():
@@ -222,25 +221,12 @@ def transition(root, task_id, target):
     task_yaml = src / "task.yaml"
 
     if current == "REVIEW" and target == "DONE":
-        rv = top_scalar(read_text(src / "review.yaml"), "verdict")
-        if rv not in {"PASS", "PASS_WITH_NOTES"}:
-            raise SystemExit(f"ERROR: DONE requires review.yaml verdict PASS/PASS_WITH_NOTES, got {rv}")
-        task_src = read_text(task_yaml)
-        risk = nested_scalar(task_src, "planning", "risk")
-        if risk == "high":
-            qa_src = read_text(src / "receipt.qa.yaml")
-            risk_result = nested_scalar(qa_src, "risk_gate", "result")
-            cross_result = nested_scalar(qa_src, "cross_family_review", "result")
-            human_result = nested_scalar(qa_src, "human_approval", "result")
-            rollback = src / "rollback.md"
-            if risk_result != "PASS":
-                raise SystemExit(f"ERROR: high-risk DONE requires risk_gate.result PASS, got {risk_result}")
-            if cross_result not in {"PASS", "WAIVED"}:
-                raise SystemExit(f"ERROR: high-risk DONE requires cross-family review PASS/WAIVED, got {cross_result}")
-            if human_result != "APPROVED":
-                raise SystemExit(f"ERROR: high-risk DONE requires human_approval.result APPROVED, got {human_result}")
-            if not rollback.exists() or not rollback.read_text(encoding="utf-8").strip():
-                raise SystemExit("ERROR: high-risk DONE requires non-empty rollback.md")
+        try:
+            errors = done_errors(read_yaml(task_yaml), src)
+        except (ValueError, OSError, TypeError, KeyError) as exc:
+            raise SystemExit(f"ERROR: invalid acceptance evidence: {exc}") from exc
+        if errors:
+            raise SystemExit("ERROR: DONE rejected: " + "; ".join(errors))
 
     attempt = int(top_scalar(read_text(task_yaml), "attempt") or "1")
     contract_rev = int(top_scalar(read_text(task_yaml), "contract_revision") or "1")
@@ -250,8 +236,10 @@ def transition(root, task_id, target):
         replace_top(task_yaml, "attempt", attempt)
         reset_receipts(root, src, task_id, attempt, contract_rev)
 
-    replace_top(task_yaml, "status", target)
-    replace_nested(task_yaml, "metadata", "updated_at", now())
+    data = read_yaml(task_yaml)
+    data["status"] = target
+    data["metadata"]["updated_at"] = now()
+    write_yaml(task_yaml, data)
     dest_parent = root / STATES[target]
     dest_parent.mkdir(parents=True, exist_ok=True)
     dest = dest_parent / task_id
@@ -262,17 +250,19 @@ def transition(root, task_id, target):
 
 
 def worktree_create(root, task_id):
+    if not validate_task(root, task_id, quiet=True):
+        raise ValueError("Invalid task contract")
     _, task = find_task(root, task_id)
     src = read_text(task / "task.yaml")
     base = nested_scalar(src, "isolation", "base_branch") or "main"
     branch = nested_scalar(src, "isolation", "branch") or f"ai/{task_id}"
     if run(["git", "rev-parse", "--git-dir"], cwd=root, check=False).returncode != 0:
         raise SystemExit("ERROR: worktree requires Git repository")
-    base_exists = run(["git", "rev-parse", "--verify", base], cwd=root, check=False).returncode == 0
-    if not base_exists:
-        current = run(["git", "branch", "--show-current"], cwd=root, check=False).stdout.strip()
-        base = current or "HEAD"
-        print(f"WARNING: configured base branch not found; using {base}", file=sys.stderr)
+    if run(["git", "status", "--porcelain"], cwd=root).stdout.strip():
+        raise ValueError("Commit or stash workspace changes, including task contract, before creating a worktree")
+    base_commit = run(["git", "rev-parse", "--verify", f"{base}^{{commit}}"], cwd=root).stdout.strip()
+    if base_commit != run(["git", "rev-parse", "HEAD"], cwd=root).stdout.strip():
+        raise ValueError("Configured base must equal current HEAD containing the committed task; no silent fallback")
     wtroot = root / ".worktrees"
     wtroot.mkdir(exist_ok=True)
     dest = wtroot / task_id
@@ -284,7 +274,7 @@ def worktree_create(root, task_id):
     branch_exists = run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], cwd=root, check=False).returncode == 0
     cmd = ["git", "worktree", "add"]
     if branch_exists:
-        cmd += [str(dest), branch]
+        raise ValueError("Task branch already exists; inspect it and choose a fresh contract branch")
     else:
         cmd += ["-b", branch, str(dest), base]
     cp = run(cmd, cwd=root, check=False)
@@ -296,6 +286,7 @@ def worktree_create(root, task_id):
 
 
 def worktree_remove(root, task_id, force=False):
+    checked_id(task_id)
     dest = root / ".worktrees" / task_id
     if not dest.exists():
         raise SystemExit(f"ERROR: worktree not found: {dest}")
@@ -309,18 +300,57 @@ def worktree_remove(root, task_id, force=False):
     print(f"REMOVED {dest}")
 
 
-def start(root, task_id, with_worktree):
-    state, _ = find_task(root, task_id)
+def start(root, task_id, with_worktree, approval=None):
+    state, folder = find_task(root, task_id)
     if state != "READY":
         raise SystemExit(f"ERROR: start requires READY task, got {state}")
     if not validate_task(root, task_id):
         raise SystemExit(2)
+    task = read_yaml(folder / "task.yaml")
+    mode = task.get("execution", {}).get("mode", "direct")
+    if mode == "delegated":
+        raise ValueError("Delegated task: use prepare instead of start")
+    for dependency in task["planning"].get("depends_on", []):
+        dep_state, _ = find_task(root, dependency)
+        if dep_state not in {"DONE", "ARCHIVED"} or not validate_task(root, dependency, quiet=True):
+            raise ValueError(f"Dependency not completed: {dependency}")
+    if mode == "approval_required" or task["planning"]["risk"] == "high" or any(task["authority"].values()):
+        require_approval(task, task_id, approval)
+    if task["isolation"]["worktree"] and not with_worktree:
+        raise ValueError("Task requires --worktree isolation")
     if with_worktree:
         dest = worktree_create(root, task_id)
-        transition(dest, task_id, "IN_PROGRESS")
-        print("NOTE: active state is task-branch local until the branch is integrated.")
-    else:
-        transition(root, task_id, "IN_PROGRESS")
+        print(f"EXECUTION WORKSPACE: {dest}")
+    active = transition(root, task_id, "IN_PROGRESS")
+    print(f"CONTROLLER RECEIPT: {active / 'receipt.executor.yaml'}")
+    return active
+
+
+def create(root, ident, title, objective, risk="low", mode="direct"):
+    checked_id(ident)
+    if task_locations(root, ident):
+        raise ValueError(f"Task already exists: {ident}")
+    if not title.strip() or not objective.strip() or risk not in RISK or mode not in {"direct", "delegated", "approval_required"}:
+        raise ValueError("Nonempty title/objective and valid risk/mode required")
+    folder = root / STATES["READY"] / ident
+    shutil.copytree(root / ".ai/templates/task", folder)
+    task = read_yaml(folder / "task.yaml")
+    task.update(id=ident, title=title, objective=objective)
+    task["planning"]["risk"] = risk
+    task["execution"]["mode"] = mode
+    task["roles"]["executor"] = "codex" if mode == "direct" else "antigravity"
+    task["isolation"].update(branch=f"ai/{ident}", worktree=True)
+    task["metadata"].update(created_at=now(), updated_at=now())
+    if risk == "high":
+        task["risk_controls"] = dict.fromkeys(task["risk_controls"], True)
+    # An empty acceptance list keeps a scaffold invalid until a planner fills it.
+    task["acceptance"] = []
+    task["checks"]["required"] = []
+    task["scope"]["writable"] = []
+    write_yaml(folder / "task.yaml", task)
+    reset_receipts(root, folder, ident, 1, 1)
+    print(f"CREATED {folder}; fill scope, acceptance and checks before validate/start")
+    return folder
 
 
 def status(root):
@@ -333,9 +363,14 @@ def status(root):
 def main():
     ap = argparse.ArgumentParser(description="Core task protocol helper (compatibility entry point)")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("create"); p.add_argument("task_id")
+    p.add_argument("--title", required=True); p.add_argument("--objective", required=True)
+    p.add_argument("--risk", choices=sorted(RISK), default="low")
+    p.add_argument("--mode", choices=["direct", "delegated", "approval_required"], default="direct")
     p = sub.add_parser("validate"); p.add_argument("task_id")
     p = sub.add_parser("transition"); p.add_argument("task_id"); p.add_argument("state", choices=list(STATES))
     p = sub.add_parser("start"); p.add_argument("task_id"); p.add_argument("--worktree", action="store_true")
+    p.add_argument("--approval-file")
     p = sub.add_parser("worktree-create"); p.add_argument("task_id")
     p = sub.add_parser("worktree-remove"); p.add_argument("task_id"); p.add_argument("--force", action="store_true")
     sub.add_parser("status")
@@ -343,8 +378,9 @@ def main():
     root = repo_root()
     if ns.cmd == "validate":
         return 0 if validate_task(root, ns.task_id) else 2
-    if ns.cmd == "transition": transition(root, ns.task_id, ns.state)
-    elif ns.cmd == "start": start(root, ns.task_id, ns.worktree)
+    if ns.cmd == "create": create(root, ns.task_id, ns.title, ns.objective, ns.risk, ns.mode)
+    elif ns.cmd == "transition": transition(root, ns.task_id, ns.state)
+    elif ns.cmd == "start": start(root, ns.task_id, ns.worktree, ns.approval_file)
     elif ns.cmd == "worktree-create": worktree_create(root, ns.task_id)
     elif ns.cmd == "worktree-remove": worktree_remove(root, ns.task_id, ns.force)
     elif ns.cmd == "status": status(root)
@@ -352,4 +388,8 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2)

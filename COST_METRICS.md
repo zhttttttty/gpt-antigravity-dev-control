@@ -1,19 +1,29 @@
-# Cost metrics (measure, do not promise savings)
+# 成本指标：测量，不承诺节省
 
-[中文](COST_METRICS.zh-CN.md)
+比较范围相近、由 Codex 直接完成和通过本地委派完成的任务。记录两边的实际用量、
+耗时、Review 时间、返工次数和人工干预次数。CLI 输出字节数不等于计费 Token。
 
-Compare similarly scoped tasks completed directly by Codex and through local
-delegation. Include both products' consumption, elapsed time, review effort,
-rework and human intervention. Never equate CLI stdout bytes with billed tokens.
-
-| Task / mode | Codex usage + source | Antigravity usage + source | Wall time | Reworks | Human interventions | Outcome |
+| 任务 / 模式 | Codex 用量与来源 | Antigravity 用量与来源 | 耗时 | 返工 | 人工干预 | 结果 |
 |---|---|---|---|---|---|---|
-| No measured production tasks yet | unknown | unknown | unknown | unknown | unknown | unmeasured |
+| 尚无生产任务测量 | unknown | unknown | unknown | unknown | unknown | 未测量 |
 
-Runtime compact receipts record controller elapsed seconds and nullable token
-fields. Fill consumption from actual per-task/provider records when available.
-Account-wide quota percentages cannot reliably be attributed to one task. Record
-model/version, task scope and measurement window for comparisons. Include failed
-attempts and review time. Subscription quota reduction, billed token reduction
-and monetary savings are different measures. Phase one does not automatically
-collect provider usage. No fixed percentage or total-cost reduction is guaranteed.
+精简回执记录控制器耗时和可选 Token 字段；实际用量应从每个任务或 Provider 的记录
+填写。账号级额度不能可靠归因到单个任务。比较时记录模型版本、任务范围和测量窗口，
+并包含失败尝试和 Review 时间。
+
+订阅额度、计费 Token 和货币成本是不同指标。当前流程不会自动收集 Provider 用量，
+不保证固定比例或总成本下降。
+
+## 混合执行比较
+
+选择单文件修复、多文件功能和跨模块故障等代表任务，固定提示词、起始提交与验收
+条件，各方案重复两到三次。比较 Root 直接执行、原生 Luna 执行和 Antigravity 执行；
+保持审查要求一致，不能把省略必要验证算作优化。
+
+分别记录未缓存输入、缓存输入、输出与推理用量，并遵循 Provider 字段定义，不要
+重复加总可能属于输出子集的推理 Token。记录模型/推理档位、CLI 版本、并发数、
+失败尝试和全流程耗时。五小时/七天额度变化是账号窗口观测，需注明其他会话干扰
+和窗口重置；不能从原始 Token 推算未公开的订阅额度换算关系。
+
+本项目未复制上游 rollout 解析器，也未实现自动收集 Provider 用量；没有数据时填写
+UNKNOWN，不把日志字节数、另一侧的免费额度或未运行测试当作节省证据。

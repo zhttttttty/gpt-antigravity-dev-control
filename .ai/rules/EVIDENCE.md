@@ -1,25 +1,19 @@
-# Evidence Standard
+# 证据标准
 
-A task is accepted on evidence, not confidence.
+按证据而非信心验收任务。
 
-## Executor Evidence
+## 执行证据
 
-- exact changed files;
-- base/head commit when available;
-- command + exit code;
-- test/check result;
-- acceptance criterion mapping;
-- known issues;
-- unverified items;
-- architecture deviation statement.
+- 精确变更文件及可获得的基础/头部提交。
+- 命令、退出码和测试/检查结果。
+- 验收条件映射。
+- 已知问题、未验证事项和架构偏离声明。
 
-## Reviewer Evidence
+## 审查证据
 
-- scope verdict;
-- risk gate verdict;
-- acceptance verdict for each AC;
-- regression/security findings;
-- exact blocking findings;
-- final verdict.
+- 范围和风险门结论。
+- 每个 AC 的验收结论。
+- 回归、安全发现及明确阻塞项。
+- 最终结论。
 
-Use explicit states: `PASS`, `FAIL`, `NOT_RUN`, `UNKNOWN`, `NOT_APPLICABLE`.
+使用明确状态：`PASS`、`FAIL`、`NOT_RUN`、`UNKNOWN`、`NOT_APPLICABLE`。

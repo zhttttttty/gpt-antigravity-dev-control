@@ -30,6 +30,7 @@ jobs:
           PY
       - name: CLI smoke checks
         run: |
+          python .ai/scripts/control.py check-orchestration
           python .ai/scripts/control.py status
           python .ai/scripts/control.py --help
       - name: Validate example task against Core Protocol

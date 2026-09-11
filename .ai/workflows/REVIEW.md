@@ -1,12 +1,5 @@
-# Review Workflow
+# 审查
 
-1. Read task contract as written for the current contract revision.
-2. Confirm exact implementation diff/commit range.
-3. Confirm executor receipt corresponds to that workspace/revision.
-4. Check scope and protected paths.
-5. Check each acceptance criterion against evidence and code.
-6. Check required risk gates.
-7. Check regression/security/maintainability.
-8. Record findings in QA receipt and review.yaml.
-9. Return PASS / PASS_WITH_NOTES / REWORK / BLOCKED.
-10. Do not silently fix implementation while acting as reviewer.
+遵循[统一控制流程：审查](../../docs/CONTROL_WORKFLOW.md#3-审查)和
+[风险门](../rules/RISK_GATES.md)。审查已测试的同一快照；
+只读审查者返回发现，由 Root 记录。

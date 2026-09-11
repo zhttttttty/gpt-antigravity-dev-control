@@ -1,16 +1,18 @@
-# Task Context
+# 任务上下文
 
-[中文](context.zh-CN.md)
+## 相关架构
 
-## Relevant Architecture
-- No architecture change is allowed.
+- 不允许架构变更。
 
-## Relevant Files
-- `src/demo/**`
-- `tests/demo/**`
+## 相关文件
 
-## Existing Behavior
-No greeting helper exists in this example.
+- src/demo/**
+- tests/demo/**
 
-## Constraints / Gotchas
-- Keep the implementation deterministic and dependency-free.
+## 当前行为
+
+该示例中还没有问候辅助函数。
+
+## 约束和注意事项
+
+- 实现必须确定且不引入依赖。

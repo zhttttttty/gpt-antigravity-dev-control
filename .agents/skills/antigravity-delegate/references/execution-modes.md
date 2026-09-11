@@ -1,14 +1,32 @@
-# Execution modes and capability mapping
+# 执行模式与能力映射
 
-`direct`, `delegated`, and `approval_required` are controller routes in the task contract. They are not values for `agy --mode`.
+`direct`、`delegated` 和 `approval_required` 是契约中的控制器路由，
+不是 `agy --mode` 的值。
 
-Before every run, probe the executable with `--version`, `--help`, `agent`, `agents`, and `agent list`. Treat the help output as the source of truth for supported flags and mode values. The current known `agy` values are `accept-edits` and `plan`, but adapters must not hard-code that assumption.
+## 选择后端
 
-| User intent | agy mapping | Required constraint |
-| --- | --- | --- |
-| Full access to the disposable worktree | Omit `--sandbox` | This does not expand the task contract or authorization scope. |
-| Automatically approve tool calls | Add `--dangerously-skip-permissions` only when advertised by `--help` | Use only after explicit approval and only in an isolated worktree. |
-| Read-only review | `--mode plan` | Prompt must forbid create, edit, delete, commit, merge, and push. |
-| Normal implementation | `--mode accept-edits` when supported | Keep the task scope, receipt, test, and review gates. |
+| 执行负责人 | 路由 | 派发与证据 |
+|---|---|---|
+| Root 或人类 | `direct` | 核心生命周期、显式检查与回执 |
+| 原生 Codex worker | `direct` | 真实 `spawn_agent`，Root 核验回执与范围 |
+| 本地 Antigravity | `delegated` 或 `approval_required` | `control.py` 的 probe/prepare/launch/collect |
 
-If a requested flag is not advertised, fail closed and report the unsupported capability. Never translate the controller route `direct` into an invented agy mode. The launch wrapper must pass arguments as an array (or `ProcessStartInfo.ArgumentList`) rather than concatenate a shell command.
+原生 explorer、researcher、tester、reviewer 可以辅助两条路径。
+不要设置 `execution.mode: native`，也不要虚构 Gemini Codex 角色。
+direct 下 agy adapter 不启用。任何后端都须遵守架构与风险门，见[任务协议](task-protocol.md)。
+
+## 本地能力映射
+
+每次 agy 运行前探测 `--version`、`--help`、`agent`、`agents` 和 `agent list`。
+帮助输出是参数与模式支持情况的依据。已知模式有 `accept-edits` 和 `plan`，
+但 Adapter 不能硬编码假定它们必然可用。
+
+| 意图 | agy 映射 | 约束 |
+|---|---|---|
+| 访问一次性 Worktree | 省略 `--sandbox` | 不扩大契约和授权范围 |
+| 自动批准工具调用 | 帮助确认后添加 `--dangerously-skip-permissions` | 须明确批准且使用隔离 Worktree |
+| 只读审查 | `--mode plan` | 提示词禁止创建、修改、删除、提交、合并和推送 |
+| 正常实现 | 支持时用 `--mode accept-edits` | 保留范围、回执、测试和审查门 |
+
+未声明支持的参数应拒绝并报告，不能把 direct 转成虚构 agy 模式。
+启动参数必须以数组或 `ProcessStartInfo.ArgumentList` 传递，不拼接 Shell 命令。

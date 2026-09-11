@@ -2,8 +2,10 @@ schema_version: 2
 task_id: TASK-XXX
 contract_revision: 1
 attempt: 1
-reviewer: gpt-5.6-sol
+# Record the actual reviewer identity, not merely the preferred model.
+reviewer: null
 status: NOT_REVIEWED
+# Set REVIEWED only after independent checks; DONE validates current identities and evidence.
 reviewed_at: null
 
 risk_gate:

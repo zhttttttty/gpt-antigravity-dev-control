@@ -23,9 +23,9 @@ planning:
   risk: medium
 
 roles:
-  planner: gpt-5.6-sol
+  planner: gpt-5.6-luna
   executor: antigravity
-  reviewer: gpt-5.6-sol
+  reviewer: gpt-6-astra
 
 objective: >-
   <One clear independently reviewable outcome.>
@@ -80,4 +80,4 @@ artifacts:
 metadata:
   created_at: null
   updated_at: null
-  created_by: gpt-5.6-sol
+  created_by: gpt-5.6-luna

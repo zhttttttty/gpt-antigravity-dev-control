@@ -1,48 +1,29 @@
-# Risk Gates
+# 风险门
 
-Risk is based on potential impact, not model strength or confidence.
+根据潜在影响判断风险，不依据模型能力或信心。
 
-## Low
+## 低风险
 
-Typical: local bug fix, isolated refactor, documentation, non-critical test improvement.
+典型为局部修复、独立重构、文档和非关键测试改进。
+要求范围检查、执行回执、可用时的针对性检查、按配置角色独立审查和 QA 回执。
+推荐 Worktree；契约明确要求时必须使用。
 
-Required:
+## 中风险
 
-- bounded scope check;
-- executor receipt;
-- targeted checks when available;
-- independent GPT-5.6 review;
-- QA receipt.
+典型为用户可见功能、跨文件改动、集成行为、依赖使用或有明显回归可能的变更。
+要求独立 Worktree、执行回执、可用时的必要自动化测试、回归检查、独立审查和 QA 回执。
 
-Worktree: recommended.
+## 高风险
 
-## Medium
+典型为结构/迁移、认证/安全、计费、破坏性数据操作、部署拓扑、破坏性 API 或重大框架/依赖。
 
-Typical: user-visible feature, cross-file change, integration behavior, dependency use, meaningful regression potential.
+执行前或合并前按阶段满足：
 
-Required:
+- 独立 Worktree 和明确架构/风险事前审查。
+- 涉及架构门时记录 ADR。
+- 执行回执、可用的自动化测试和回归证据。
+- 回滚计划及按配置角色的独立审查。
+- 跨家族二次审查，或有记录的人工豁免。
+- 明确人工合并审批。
 
-- isolated worktree;
-- executor receipt;
-- required automated tests when available;
-- regression check;
-- independent GPT-5.6 review;
-- QA receipt.
-
-## High
-
-Typical: schema/migration, auth/security, billing, destructive data behavior, deployment topology, breaking API, major dependency/framework change.
-
-Required before/for merge:
-
-- isolated worktree;
-- explicit architecture/risk pre-review;
-- ADR where architecture-gated;
-- executor receipt;
-- automated tests and regression evidence when available;
-- rollback plan;
-- independent GPT-5.6 review;
-- cross-family second review **or** documented human waiver;
-- explicit human merge approval.
-
-The executor cannot lower risk. A reviewer/planner may raise risk at any time.
+执行者不得降低风险，审查者或规划者可随时提高风险。

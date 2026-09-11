@@ -1,14 +1,11 @@
-# Multi-agent coordination protocol
+# 多代理协作协议
 
-[中文](coordination-protocol.zh-CN.md)
+Codex 是协调者。Antigravity Agent 不直接互相对话，而是通过显式依赖、需要串行时
+共享的 Git 状态，以及 `sessions.json` 中登记的报告路径协作。
 
-Codex is the coordinator. Antigravity agents do not chat with each other; they
-coordinate through explicit dependencies, shared Git state when intentionally
-serialized, and report paths recorded in `sessions.json`.
+## 配置
 
-## Configuration
-
-`launch_agents.ps1` accepts a JSON object with a `tasks` array:
+`launch_agents.ps1` 接收包含 `tasks` 数组的 JSON：
 
     {
       "tasks": [
@@ -16,49 +13,47 @@ serialized, and report paths recorded in `sessions.json`.
           "name": "full",
           "worktree": "C:/repo-review",
           "mode": "plan",
-          "prompt": "Review the full repository",
+          "prompt": "审阅整个仓库",
           "max_retries": 0
         },
         {
           "name": "backend",
           "worktree": "C:/repo-backend",
           "mode": "accept-edits",
-          "prompt": "Implement the backend contract",
+          "prompt": "实现后端任务契约",
           "depends_on": ["full"],
           "timeout_seconds": 1260
         }
       ]
     }
 
-Optional task fields are `depends_on`, `max_retries` (zero or one),
-`timeout_seconds`, `auto_approve`, `effort`, `model`, and initial `attempt`.
+可选字段包括 `depends_on`、`max_retries`（零或一）、`timeout_seconds`、
+`auto_approve`、`effort`、`model` 和初始 `attempt`。
 
-## Scheduling invariants
+## 调度约束
 
-- The default concurrency is two and the hard maximum is four.
-- Requests above two start with two agents and ramp to the target only after the
-  first successful completion. Large read-only/document workloads may use three
-  or four. Workloads containing writers are capped at two unless
-  `-AllowHighWriteConcurrency` is explicit; independent writer Worktrees remain
-  required.
-- A user-local exclusive lock prevents two launcher processes from consuming
-  the same agy capacity at once.
-- Dependencies form a validated DAG and determine `planned_wave` ordering.
-- Read-only `plan` agents may share a worktree concurrently. If either agent can
-  write, that worktree is exclusive until the process exits.
-- A failed or timed-out task retries at most once. The first failure immediately
-  aborts ramp-up and lowers effective concurrency to one for the rest of the run.
-- stdout and stderr are drained asynchronously to prevent pipe-buffer deadlock.
-- A dependent task receives the stable paths of completed dependency reports.
+以下是本地 agy 启动器的保证，不是覆盖 Codex 原生代理的全局锁。Root 还需遵守
+项目合计预算（默认两个活跃执行单元），同时计算原生任务和每个 agy 分片。只给
+启动器分配剩余容量；分配两个槽位前先结束原生工作。使用下述更高启动器上限前，
+必须先协调调整项目合计预算。见 [统一编排规则](../../../../.ai/rules/ORCHESTRATION.md)。
 
-Use separate worktrees for independent implementation shards. Use the same
-worktree plus `depends_on` only when later work must see earlier changes and
-serial execution is intended. No task automatically merges another branch.
+- 默认并发数为两个，硬性最大值为四个。
+- 请求三个或四个并发时，启动器先运行两个 Agent，首个任务成功后才提升到目标值。
+  大型只读或多文档任务可以使用三到四个；包含写入任务时默认仍限制为两个，只有显式
+  使用 `-AllowHighWriteConcurrency` 才会放宽，并且各写入 Agent 仍应使用独立 Worktree。
+- 用户级排他锁阻止两个启动器同时占用本机 agy 容量。
+- 依赖关系必须形成有效 DAG，并据此计算 `planned_wave`。
+- 只读 `plan` Agent 可以共享 Worktree；只要任一 Agent 可写，该 Worktree 就必须独占。
+- 失败或超时最多重试一次；首次失败会终止扩容，并将本次运行剩余阶段立即降为单并发。
+- stdout 和 stderr 会被异步读取，避免管道缓冲区阻塞。
+- 依赖任务会收到已完成上游报告的稳定路径。
 
-## Outputs
+相互独立的实现分片应使用不同 Worktree。只有后续任务必须读取前序变更并且明确要求
+串行时，才使用同一 Worktree 加 `depends_on`。调度器不会自动合并分支。
 
-Each attempt has separate report, execution log, and stderr files. The latest
-report is also copied to `<name>.md`. `sessions.json` records the dependency
-graph, attempts, status, timeout, prompt hash, and effective concurrency.
-`collect_reports.ps1` writes `summary.json` and `handoff.md`; Codex then performs
-the independent verification and merges duplicate findings.
+## 输出
+
+每次尝试都有独立报告、执行日志和 stderr；最新结果同时写入 `<name>.md`。
+`sessions.json` 记录依赖图、尝试历史、状态、超时、提示词哈希和实际并发数。
+`collect_reports.ps1` 生成 `summary.json` 与 `handoff.md`，之后由 Codex 独立验证并合并
+重复发现。

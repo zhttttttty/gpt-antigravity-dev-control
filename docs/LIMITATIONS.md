@@ -1,26 +1,20 @@
-# Current limitations
+# 当前限制
 
-[中文](LIMITATIONS.zh-CN.md)
+该控制平面是本地、人工监督的开发控制器，不是分布式自动化平台。
 
-The control plane is intentionally local and human-supervised rather
-than a distributed automation platform.
+- 本地 Antigravity 路径需要可用的 agy、登录状态和工具权限；仅 Root/原生执行不依赖 agy。
+- probe/help 成功不代表认证完成或模型执行成功。
+- Worktree 隔离 Git 状态，但不是操作系统级安全沙箱。
+- Scope 检查发生在执行后，不能阻止所有越权读取。
+- 控制器不会自动合并、独立重跑测试或宣布任务 DONE。
+- 单任务恢复仍是显式操作；本地多代理启动器只允许自动重试一次，随后停止，不存在无人值守重试循环。
+- 未实现运行时自动清理、崩溃安全事务、自动备份、指标采集和无人值守批量调度。只读任务健康探测后最多四个并发；写入任务默认最多两个，除非显式放宽。不协调远程 Worker。
+- full-access 会跳过 agy 确认，只能用于一次性可信 Worktree。
+- 精简回执同时包含观测到的 Git 状态和 Executor 声明，Codex 仍需独立检查。
+- 不保证固定的 Token、时间或成本下降，必须用真实任务测量。
 
-- A working local agy installation, login, and tool permissions are required.
-- Probe/help success does not prove authentication or successful model execution.
-- Worktrees isolate Git state but are not an operating-system security sandbox.
-- Scope validation is post-execution and cannot prevent all out-of-scope access.
-- The controller does not automatically merge, independently rerun tests, or
-  declare a task DONE.
-- Single-task recovery is explicit. The local multi-agent launcher permits only
-  one automatic retry and then stops; there is no unattended retry loop.
-- Runtime cleanup, crash-safe multi-file transactions, automatic backup, metrics
-  ingestion, and unattended batch scheduling are not implemented. Local parallel
-  dispatch supports up to four read-only agents after ramp-up; writing workloads
-  stay capped at two unless explicitly overridden. Remote workers are not coordinated.
-- Full-access mode skips agy confirmations and therefore belongs only in a
-  disposable trusted worktree; it does not grant administrator rights.
-- Compact receipts report observed Git state and executor claims. Codex still
-  needs to inspect the relevant diff and independently verify acceptance.
-- No fixed token, time, or cost reduction is guaranteed. Measure real tasks.
+原生派发和回执核验由 Root 协调，control.py 不自动执行。原生/agy 合计默认两个
+活跃执行单元，没有跨进程共享硬锁；agy 启动器的更高容量不会覆盖该预算。离线
+配置检查不能证明实际模型路由、全局覆盖或沙箱执行。见 [混合执行](HYBRID_ORCHESTRATION.md)。
 
-Detailed operational failure handling is in [Local Delegation](LOCAL_DELEGATION.md).
+详细故障处理见[本地委派操作](LOCAL_DELEGATION.md)。

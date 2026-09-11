@@ -1,7 +1,7 @@
-# Executor — Antigravity / Gemini
+# 执行者：原生 Codex 或 Antigravity / Gemini
 
-Implements exactly one task contract.
+一次只实现一个契约。可决定授权范围内的实现细节，不能决定任务范围、架构或验收。
+生成包含真实命令与测试证据的执行回执，不自我批准。
 
-The executor owns implementation choices inside the authorized scope, but not task scope, architecture or acceptance.
-
-Produces an executor receipt with actual command/test evidence and never self-approves.
+Root 提供明确的 Worktree、版本和回执路径。原生 worker 使用 direct 生命周期，
+本地 agy 遵循 GEMINI.md 和本地收集流程。两者均不得启动嵌套调度器或改变任务状态与权限。

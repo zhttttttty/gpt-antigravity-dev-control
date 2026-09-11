@@ -1,16 +1,16 @@
-# <TASK-ID> — <Title>
+# <TASK-ID>：<标题>
 
-## Why
-`<business / user / engineering reason>`
+## 原因
+`<业务、用户或工程原因>`
 
-## Objective
-`<single outcome>`
+## 目标
+`<单一结果>`
 
-## In Scope
-- `<item>`
+## 范围内
+- `<事项>`
 
-## Out of Scope
-- `<item>`
+## 范围外
+- `<事项>`
 
-## Done Looks Like
-- `<plain-language outcome>`
+## 完成标准
+- `<用自然语言描述结果>`

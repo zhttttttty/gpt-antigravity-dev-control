@@ -5,12 +5,10 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fnmatch
-import hashlib
 import io
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 import tempfile
@@ -18,6 +16,7 @@ import time
 
 import yaml
 import ai
+from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
 from antigravity_cli import AntigravityCLI, diagnose
@@ -40,15 +39,6 @@ def save(path, value):
     atomic(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
-def read_yaml(path):
-    if path.stat().st_size > 128_000:
-        raise ValueError(f"YAML exceeds 128KB: {path}")
-    value = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError(f"Expected YAML mapping: {path}")
-    return value
-
-
 def git(root, *args):
     return subprocess.run(["git", *args], cwd=root, check=True,
                           capture_output=True, text=True, encoding="utf-8").stdout.strip()
@@ -58,18 +48,6 @@ def transition(root, ident, target):
     # The core helper is chatty; preserve one JSON document on this CLI's stdout.
     with contextlib.redirect_stdout(io.StringIO()):
         return ai.transition(root, ident, target)
-
-
-def digest(task):
-    # State transitions are controller-owned, not contract revisions.
-    data = {k: v for k, v in task.items() if k not in {"status", "metadata"}}
-    return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
-
-
-def task_id(value):
-    if not re.fullmatch(r"TASK-[A-Za-z0-9][A-Za-z0-9_-]{0,79}", value):
-        raise ValueError("Task ID must be TASK- followed by letters, digits, _ or -")
-    return value
 
 
 @contextlib.contextmanager
@@ -135,12 +113,7 @@ def prepare(root, ident, approved=False, approval=None):
     contract_hash = digest(task)
     approval_data = None
     if routing["mode"] == "approval_required":
-        approval_data = read_yaml(Path(approval)) if approval else {}
-        if not (approval_data.get("task_id") == ident and
-                approval_data.get("contract_sha256") == contract_hash and
-                approval_data.get("result") == "APPROVED" and approval_data.get("approved_by") and
-                approval_data.get("evidence")):
-            raise ValueError(f"Pre-review approval required for contract {contract_hash}; see docs/LOCAL_DELEGATION.md")
+        approval_data = require_approval(task, ident, approval)
     if git(root, "status", "--porcelain"):
         raise ValueError("Commit or stash workspace changes, including task contract, before prepare")
     if task["isolation"].get("worktree") is not True:
@@ -184,8 +157,8 @@ def prepare(root, ident, approved=False, approval=None):
         atomic(runtime / "context.md", pack)
         template = read_yaml(root / ".ai/templates/task/receipt.executor.yaml")
         template.update(task_id=ident, attempt=task["attempt"], contract_revision=task["contract_revision"])
-        atomic(runtime / "receipt.executor.yaml", yaml.safe_dump(template, sort_keys=False))
-        atomic(run_dir / "contract.yaml", yaml.safe_dump(task, sort_keys=False))
+        write_yaml(runtime / "receipt.executor.yaml", template)
+        write_yaml(run_dir / "contract.yaml", task)
         atomic(run_dir / "context.md", pack)
         transition(root, ident, "IN_PROGRESS")
         record["phase"] = "PREPARED"
@@ -287,21 +260,11 @@ def collect(root, ident):
         raise ValueError("Receipt identity/revision mismatch")
     if receipt.get("status") not in {"COMPLETE", "BLOCKED", "FAILED"}:
         raise ValueError("Receipt is not complete; launcher exit is not evidence")
-    commands = receipt.get("commands") or []
-    evidence = receipt.get("acceptance_evidence") or []
-    if not isinstance(commands, list) or not all(isinstance(c, dict) for c in commands):
-        raise ValueError("Invalid commands evidence")
-    if not isinstance(evidence, list) or not all(isinstance(c, dict) for c in evidence):
-        raise ValueError("Invalid acceptance evidence")
-    required = [c["command"] for c in task["checks"].get("required", [])]
-    passed = sum(any(c.get("command") == expected and type(c.get("exit_code")) is int and c["exit_code"] == 0
-                     and c.get("result") == "PASS" for c in commands) for expected in required)
-    ac_passed = sum(any(e.get("acceptance_id") == ac["id"] and e.get("result") == "PASS" and e.get("evidence")
-                        for e in evidence) for ac in task["acceptance"])
+    passed, required_count, ac_passed, acceptance_count = evidence_counts(task, receipt)
     issues = []
     if violations:
         issues.append("Out-of-scope changes; inspect local full evidence")
-    if passed != len(required) or ac_passed != len(task["acceptance"]):
+    if passed != required_count or ac_passed != acceptance_count:
         issues.append("Required evidence missing or failed")
     if receipt.get("known_issues") or receipt.get("unverified_items"):
         issues.append("Executor reports issues or unverified items")
@@ -312,8 +275,8 @@ def collect(root, ident):
                "task_state": target, "base_commit": record["base_commit"], "head_commit": head,
                "changed_files": len(files), "changed_files_preview": files[:20],
                "scope_check": "FAIL" if violations else "PASS", "known_issues": issues,
-               "checks": {"reported_passed": passed, "required": len(required)},
-               "acceptance": {"reported_passed": ac_passed, "total": len(task["acceptance"])},
+               "checks": {"reported_passed": passed, "required": required_count},
+               "acceptance": {"reported_passed": ac_passed, "total": acceptance_count},
                "evidence_trust": "executor_reported; independent review pending",
                "review_verdict": "PENDING", "elapsed_seconds": round(time.time() - record["created_at"], 2),
                "usage": {"codex_tokens": None, "antigravity_tokens": None},
@@ -326,7 +289,7 @@ def collect(root, ident):
     receipt["workspace"] = {"path": str(worktree), "branch": record["branch"], "base_commit": record["base_commit"], "head_commit": head}
     receipt["changed_files"] = files
     receipt["scope_check"] = {"result": summary["scope_check"], "out_of_scope_files": violations}
-    atomic(folder / "receipt.executor.yaml", yaml.safe_dump(receipt, sort_keys=False))
+    write_yaml(folder / "receipt.executor.yaml", receipt)
     save(path.parent / "receipt.compact.json", summary)
     transition(root, ident, target)
     record.update(phase="COLLECTED", head_commit=head)
@@ -385,7 +348,15 @@ def main():
                           "diagnostic": diagnose(Path(record["worktree"]) / ".ai/runtime/delegation/receipt.executor.yaml", logs),
                           "next_step": "Collect completed evidence, or inspect local logs and use confirmed interactive recovery; never infer success from exit 0"}
             else:
-                _, result = latest(root, args.task_id)
+                if ai.task_locations(root, args.task_id):
+                    state, folder, task = load_task(root, args.task_id)
+                    result = {"task_id": args.task_id, "task_state": state,
+                              "task_folder": str(folder), "execution": task.get("execution", {})}
+                    if list((root / ".ai/runtime/logs" / args.task_id).glob("run-*/run.json")):
+                        _, record = latest(root, args.task_id)
+                        result.update(record, task_state=state)
+                else:
+                    _, result = latest(root, args.task_id)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 2 if result.get("available") is False or result.get("phase") in {"LAUNCH_FAILED", "NEEDS_ATTENTION"} or result.get("status") == "BLOCKED" else 0
     except (ValueError, OSError, subprocess.SubprocessError, yaml.YAMLError, KeyError, TypeError) as exc:

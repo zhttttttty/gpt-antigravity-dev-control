@@ -6,20 +6,32 @@ fresh_context_per_task: true
 
 roles:
   architect:
-    preferred_model: gpt-5.6-sol
+    preferred_model: gpt-5.6-luna
+    reasoning_effort: max
     authority: architecture
   planner:
-    preferred_model: gpt-5.6-sol
+    preferred_model: gpt-5.6-luna
+    reasoning_effort: max
     authority: task_contract
   executor:
     preferred_tool: antigravity
     preferred_model: gemini
     authority: bounded_implementation
   reviewer:
-    preferred_model: gpt-5.6-sol
+    preferred_model: gpt-6-astra
+    reasoning_effort: low
     authority: acceptance
   human:
     authority: final
+
+# Model defaults do not grant authority or launch agents. Combined capacity is
+# coordinated by the root; no cross-runtime process lock is implemented.
+orchestration:
+  native_execution_model: gpt-5.6-luna
+  native_execution_effort: medium
+  native_subagent_limit: 2
+  combined_execution_limit: 2
+  combined_limit_enforcement: coordinator
 
 state_machine:
   READY:

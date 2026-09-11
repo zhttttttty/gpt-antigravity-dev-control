@@ -1,18 +1,18 @@
-# Task Context
+# 任务上下文
 
-Only include context needed for this task.
+只包含当前任务所需的上下文。
 
-## Relevant Architecture
-- `<component / invariant / ADR>`
+## 相关架构
+- `<组件、不变量或 ADR>`
 
-## Relevant Files
-- `<path>`
+## 相关文件
+- `<路径>`
 
-## Existing Behavior
-`<what exists now>`
+## 现有行为
+`<当前行为>`
 
-## Constraints / Gotchas
-- `<constraint>`
+## 约束与注意事项
+- `<约束>`
 
-## References
-- `<requirement / ADR / issue / doc>`
+## 参考
+- `<需求、ADR、Issue 或文档>`

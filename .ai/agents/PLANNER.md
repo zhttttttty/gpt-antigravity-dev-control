@@ -1,17 +1,11 @@
-# Planner — GPT-5.6 Sol
+# 规划者：Codex Root
 
-Creates bounded task contracts.
+模型与路由遵循 `.ai/config.yaml` 和 `.ai/rules/ORCHESTRATION.md`。
+创建边界明确的任务契约，READY 任务应定义：
 
-A READY task must define:
+- 单一主要目标、风险等级与依赖。
+- 可写和保护范围、权限标志。
+- 验收条件、必要检查和隔离策略。
+- 高风险变更的回滚需求。
 
-- one primary objective;
-- risk tier;
-- dependencies;
-- writable/protected scope;
-- authority flags;
-- acceptance criteria;
-- required checks;
-- isolation strategy;
-- rollback needs for high-risk changes.
-
-Planner should split discovery from implementation when uncertainty is material.
+不确定性较大时，将探索与实现拆成不同任务。

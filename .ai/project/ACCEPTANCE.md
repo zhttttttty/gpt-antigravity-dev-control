@@ -1,19 +1,16 @@
-# Project Acceptance
+# 项目验收
 
-## Global Definition of Done
+## 全局完成标准
 
-A project-level deliverable is accepted only when:
+项目交付物满足以下条件后才能验收：
 
-- relevant requirements are met;
-- task-level evidence is complete;
-- required tests/checks pass;
-- no unresolved high-severity review finding remains;
-- architecture decisions are documented;
-- security/compatibility constraints are met;
-- deployment/rollback requirements are satisfied where applicable.
+- 相关需求满足，任务证据完整。
+- 必要测试与检查通过，没有未解决的高严重度审查发现。
+- 架构决策已记录，安全和兼容性约束满足。
+- 适用时满足部署与回滚要求。
 
-## Required Global Checks
-- `<test/build/type/lint/security/integration command>`
+## 必要全局检查
+- `<测试/构建/类型/静态检查/安全/集成命令>`
 
-## Release / Merge Gates
-- `<human approval, CI, deployment check, etc.>`
+## 发布与合并门
+- `<人工审批、CI、部署检查等>`

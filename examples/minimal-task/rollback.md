@@ -1,5 +1,3 @@
-# Rollback Plan
-
-[中文](rollback.zh-CN.md)
+# 回滚计划
 
 NOT_REQUIRED

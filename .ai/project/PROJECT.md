@@ -1,28 +1,28 @@
-# Project
+# 项目
 
-## Name
+## 名称
 `<PROJECT_NAME>`
 
-## Problem
-`<What problem are we solving?>`
+## 问题
+`<解决什么问题>`
 
-## Outcome
-`<What should be true when the project succeeds?>`
+## 结果
+`<项目成功后应达到什么状态>`
 
-## Users / Stakeholders
-- `<user or stakeholder>`
+## 用户与相关方
+- `<用户或相关方>`
 
-## In Scope
-- `<scope>`
+## 范围内
+- `<范围>`
 
-## Explicitly Out of Scope
-- `<non-goal>`
+## 明确不做
+- `<非目标>`
 
-## Constraints
-- `<technical / business / legal / operational constraint>`
+## 约束
+- `<技术、业务、法律或运维约束>`
 
-## Success Metrics
-- `<metric + target>`
+## 成功指标
+- `<指标与目标>`
 
-## Source-of-Truth Inputs
-- `<spec / issue tracker / API / file / database>`
+## 事实来源
+- `<规格、问题跟踪、API、文件或数据库>`

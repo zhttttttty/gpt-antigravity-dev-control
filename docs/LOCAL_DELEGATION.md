@@ -1,244 +1,129 @@
-# Local Delegation Operations
+# 本地委派操作
 
-[中文](LOCAL_DELEGATION.zh-CN.md)
+Codex 负责规划和 Review，Antigravity 负责实现，人类负责合并。整个控制流程由
+Codex 在仓库内执行，不需要 Hermes、远程 Reviewer API 或后台调度器。
 
-**Codex plans and reviews; Antigravity implements; a human approves merge.**
-No remote reviewer API, automatic merge, or background scheduler is required.
-Bounded local multi-agent runs may retry one failed shard once. Task contracts, receipts, Git history and local runtime evidence
-remain the durable project record.
+## 安装与探测
 
-## Setup
+本地 agy 生命周期需要 Python 3.10+ 和 Git；运行 check-orchestration 或完整项目
+测试集时使用 Python 3.11+。
 
-Python 3.10+ and Git are required:
+    python -m pip install -r .ai/scripts/requirements-local.txt
+    python .ai/scripts/control.py --help
+    python .ai/scripts/control.py probe
 
-```sh
-python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/control.py --help
-python .ai/scripts/control.py probe
-```
+Windows 上 agy 不在 PATH 时：
 
-On Windows, agy may be installed without a PATH entry:
+    python .ai/scripts/control.py probe --executable C:\path\to\agy.exe
 
-```powershell
-python .ai/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
-```
+探测会检查 `--version`、`--help`、`agent`、`agents` 和 `agent list`，并从帮助文本
+动态解析实际参数与模式。不要假设固定版本，也不要把控制器的 `direct` 当成 agy
+模式。真实登录、条款、隐私选项和文件夹信任需要在交互终端中完成。
 
-The adapter probes `--version`, `--help`, `agent`, `agents`, and `agent list`,
-storing raw output locally and deriving supported flags and modes from help. Do
-not assume a fixed agy version or a `direct` mode. Default execution uses `--print-timeout 20m`
-and `-p <prompt>` from the isolated worktree. It does not parse stdout as JSON:
-agy prints text, and the executor must write the structured receipt file.
-The model remains the CLI's configured default. No Hermes installation is needed.
+Adapter 默认从隔离 Worktree 运行，非交互模式使用 `-p <prompt>`，不会将 stdout
+当作 JSON；结构化结果必须写入回执文件。模型保持 agy 当前配置的默认值。
+探测成功不能证明认证和工具权限。自定义版本参数可用 `launch --args-file local-argv.json`
+传入 JSON 字符串数组，支持 `{worktree}`、`{context}`、`{receipt}` 占位符；
+参数直接传给进程，不经过 Shell。Windows 批处理包装器会被拒绝，应使用原生可执行文件。
 
-### Recommended: interactive approvals
+## 交互执行
 
-```sh
-python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
-```
+    python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /path/to/agy
 
-Run in a real terminal/PTY (not a redirected job). The controller inherits its
-terminal, invokes `-i` with explicit `--add-dir` and an absolute context path,
-and lets the user approve scoped operations. Initialization may require terms,
-privacy choices and folder trust. Do not enable global bypass. After the receipt
-is written, exit the interactive CLI to return to the controller and collect.
-Interactive output includes the TUI followed by the final controller JSON; it
-is not a JSON-only stream. `launch.log` notes that terminal output is not captured;
-`agy.log` contains CLI diagnostics and can include private data, so keep it local.
+必须在真实终端中运行，不要重定向 stdin/stdout。启动后让 Executor 完成契约、测试
+和 receipt，然后退出 agy，回到 Codex 执行 collect。
 
-### Optional full-access mode
+交互输出包含 TUI 和最终控制器 JSON，不是纯 JSON 流；终端画面不写入 launch.log，
+agy.log 可能含路径、Prompt 或私有代码，应只保存在本地并在外发前脱敏。
 
-For a disposable, explicitly trusted worktree:
+## 全权限模式
 
-```sh
-python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access --executable /absolute/path/to/agy
-```
+可信的一次性 Worktree 可以显式使用：
 
-This requires `--approve`; it is never the default. It only skips agy tool
-confirmations. It does not grant Windows administrator rights, constrain
-filesystem access, or remove receipt, scope and review gates. Use it only when
-the worktree and task context contain no secrets.
+    python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access
 
-Help/version success does **not** prove authentication or tool permissions.
-Authenticate interactively when prompted. The controller adds
-`--dangerously-skip-permissions` only when explicit `--full-access --approve` is
-used. A noninteractive permission prompt may require manual intervention; never
-interpret it as success. For version-specific
-arguments, `launch --args-file local-argv.json` takes a JSON string array with
-`{worktree}`, `{context}`, `{receipt}` placeholders (literal braces need doubling).
-Arguments are passed without a shell. Windows batch wrappers are rejected; use
-a native executable. Set an outer command timeout of at least 1260 seconds.
+该选项只向 agy 传递 permission-bypass 参数，不授予管理员权限，也不会移除 Scope、
+Receipt、Review 或人工合并门。永远不要静默启用。
 
-### Protocol scripts for multi-agent review
+## 多代理审阅协议脚本
 
-The Skill includes deterministic scripts for bounded review shards:
+需要多个边界清晰的审阅分片时，使用 Skill 自带的确定性脚本：
 
-```powershell
-powershell -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
-powershell -File .agents/skills/antigravity-delegate/scripts/create_review_worktree.ps1 -Name review -OutputFile .ai/runtime/review-worktree.json
-powershell -File .agents/skills/antigravity-delegate/scripts/launch_agents.ps1 -ConfigPath .ai/runtime/agents.json -OutputDir .ai/runtime/review-run -MaxConcurrency 2
-powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1 -OutputDir .ai/runtime/review-run
-powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <path-from-json>
-```
+    powershell -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
+    powershell -File .agents/skills/antigravity-delegate/scripts/create_review_worktree.ps1 -Name review -OutputFile .ai/runtime/review-worktree.json
+    powershell -File .agents/skills/antigravity-delegate/scripts/launch_agents.ps1 -ConfigPath .ai/runtime/agents.json -OutputDir .ai/runtime/review-run -MaxConcurrency 2
+    powershell -File .agents/skills/antigravity-delegate/scripts/collect_reports.ps1 -OutputDir .ai/runtime/review-run
+    powershell -File .agents/skills/antigravity-delegate/scripts/cleanup_worktree.ps1 -Path <JSON 中的 path>
 
-The launcher defaults to two concurrent agents and allows up to four. Requests
-above two begin at two and ramp up after the first successful completion. Large
-read-only/document workloads may request three or four; writing workloads remain
-capped at two unless `-AllowHighWriteConcurrency` is explicit. It keeps
-`sessions.json`, reports, stderr, and execution logs together. Task entries may declare `depends_on`,
-`max_retries`, and `timeout_seconds`. Dependencies are validated as a DAG;
-read-only agents may share a Worktree, while any writer receives exclusive
-Worktree access. The first failure is retried once at most and reduces the rest
-of the run to one concurrent agent. A user-local lock prevents overlapping
-launcher processes. `summary.json` and `handoff.md` provide the compact Codex
-handoff. `git ls-files` plus non-ignored untracked files is the authoritative
-inventory; enumeration alone is not semantic reading.
+默认并发两个代理，硬性最大值为四个。请求三个或四个时会先启动两个，首个任务成功后
+才提升到目标并发。大型只读或多文档任务可以使用三到四个；写入任务默认仍限制为两个，
+除非显式传入 `-AllowHighWriteConcurrency`。任务可以声明 `depends_on`、`max_retries` 和
+`timeout_seconds`。依赖关系会按 DAG 校验；只读代理可以共享 Worktree，并发任务中只要
+有一个具备写权限，该 Worktree 就会被独占。首次失败最多自动重试一次，并将本次运行
+剩余阶段降为单并发。用户级启动锁会阻止两个调度器同时占用 agy。
+`sessions.json`、分次报告、stderr 和执行日志固定保存在同一目录，最终生成
+`summary.json` 和 `handoff.md`。覆盖统计以 `git ls-files` 加未忽略未跟踪文件为权威清单；
+枚举文件不等于完成语义阅读。
 
-## Codex skill
+这些锁和限制只覆盖 agy 启动器。Root 还需把原生 Codex 工作计入合计预算（默认
+两个活跃单元），使用更高本地容量前先协调调整预算。见 [混合执行](HYBRID_ORCHESTRATION.md)。
+单任务由 control.py prepare 创建隔离目录；上面的 review-worktree 脚本用于独立分片，
+不要为同一任务重复准备第二个 Worktree。
 
-The checked-in `.agents/skills/antigravity-delegate/SKILL.md` is repo-discoverable.
-Invoke `$antigravity-delegate` from this checkout. No global configuration changes
-are made. For another project, copy the skill and `.ai` control-plane files as
-appropriate, preserving existing project requirements. Follow the current
-[official skill documentation](https://learn.chatgpt.com/docs/build-skills) when
-installing in a different scope; do not assume a permanent global install path.
+## 单任务流程
 
-## One-task workflow
+先用 `control.py create` 或任务模板建立任务，补齐可写范围、真实验收条件和检查命令，
+再提交契约。主控工作区必须干净，`isolation.base_branch` 必须解析为包含该契约的当前
+HEAD；本地委派始终要求 Worktree 隔离。持久依赖必须已是 DONE 或 ARCHIVED。
 
-1. Copy `.ai/templates/task` into `.ai/tasks/queue/TASK-001`, replace placeholders,
-   preserve list indentation, set a bounded writable scope and real acceptance
-   criteria/test commands. Add the execution block below. Commit the task.
-2. Use a clean checkout. `isolation.base_branch` must resolve to the current HEAD
-   containing the task; no missing-base fallback is permitted. Set it to your
-   actual planning branch or `HEAD`. Worktree isolation is mandatory here.
-3. Inspect routing, confirm execution, prepare and launch:
+    python .ai/scripts/control.py validate TASK-001
+    python .ai/scripts/control.py route TASK-001
+    python .ai/scripts/control.py prepare TASK-001 --approve
+    python .ai/scripts/control.py launch TASK-001 --approve --interactive
+    python .ai/scripts/control.py status TASK-001
+    python .ai/scripts/control.py collect TASK-001
 
-```sh
-python .ai/scripts/control.py validate TASK-001
-python .ai/scripts/control.py route TASK-001
-python .ai/scripts/control.py prepare TASK-001 --approve
-python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /absolute/path/to/agy
-python .ai/scripts/control.py status TASK-001
-python .ai/scripts/control.py collect TASK-001
-```
+prepare 会创建隔离 Worktree、记录基础提交和契约摘要，并写入上下文包。collect 会
+检查 Git 祖先关系、分支状态、变更范围、回执身份、检查命令和验收证据。
 
-```yaml
-execution:
-  mode: delegated
-  adapter: antigravity_cli
-  model: configured_default
-  context_budget: compact
-  report_level: summary
-  max_execution_attempts: 2
-  escalation: codex_review
-```
+高风险或 authority 标志启用时，route 会升级为 approval_required。人类在被 Git 忽略的
+`.ai/runtime/` 创建包含 `task_id`、`contract_sha256`、`result: APPROVED`、
+`approved_by` 和 `evidence` 的审批 YAML，并通过 `prepare --approval-file PATH` 传入。
+该记录绑定当前契约，不能证明身份，也不代表批准最终合并。
 
-`direct` is the default for old tasks without this block. Small fixes/config/docs
-usually stay direct. Independent multi-file implementation/test tasks are good
-delegation candidates. `approval_required`, high risk, or enabled architecture
-authority requires a pre-review approval file in addition to --approve:
+## 证据与审查
 
-```yaml
-task_id: TASK-001
-contract_sha256: <hash from route>
-result: APPROVED
-approved_by: <human name>
-evidence: <ADR or explicit review reference>
-```
+完整日志保存在 .ai/runtime/logs/TASK-ID/，默认先读取 compact JSON。缺失证据会阻塞；
+collect 成功只会进入 REVIEW，不会独立生成 PASS，也不会自动合并。
 
-Store it under ignored `.ai/runtime/` and pass `--approval-file <path>` to prepare.
-This is an audit record bound to the contract, not identity authentication and
-not permission for merge. Existing high-risk QA, cross-family and human merge
-gates still apply. Durable task dependencies must already be DONE/ARCHIVED. The
-multi-agent launcher's `depends_on` graph coordinates shards inside one local
-run; it is not a scheduler for durable task contracts.
+上下文包是 task、brief、context 和 rollback 的 UTF-8 内容，硬上限 32KB；超限会拒绝，
+不会静默截断。Executor 在 Worktree 的 `.ai/runtime/delegation/receipt.executor.yaml`
+写回执，只提交实现文件。collect 检查增加、修改、删除和重命名前后的路径；控制文件
+始终受保护。Worktree 隔离 Git 状态，不是操作系统安全沙箱。
 
-## Evidence and review
+精简 JSON 包含 SHA、文件数量和预览、范围结果、声明通过的命令/验收计数、耗时和
+证据路径。它不编造测试总数、Token 或独立 PASS；必要时从执行日志核实真实结果。
 
-Prepare creates `.worktrees/TASK-001-1` on `ai/local/TASK-001-1`, records the base
-SHA and contract digest, and moves the controller checkout's task to IN_PROGRESS.
-The execution branch retains the original committed task snapshot. Only the
-controller checkout owns state transitions; do not run another queue worker on
-the worktree. Do not run two controllers against the same task or worktree.
+Codex 应检查精确 Diff、Receipt、测试日志和验收条件，再写 receipt.qa.yaml 与
+review.yaml。高风险任务还必须满足额外 Risk Gate 和人工审批。
 
-The context pack has a hard **32KB UTF-8 limit**, not an estimated token limit.
-It contains the task, brief, context and rollback; code/rules are read on demand.
-Oversized context is rejected, never silently truncated. Full logs and diffs
-stay in `.ai/runtime/logs/TASK-001/run-N/` and are ignored by Git. Keep runtime
-evidence backed up locally if you need durable recovery; no secrets belong in
-context packs or committed receipts.
+## 故障恢复
 
-The executor writes `.ai/runtime/delegation/receipt.executor.yaml` in its
-worktree and commits only implementation files. `collect` checks Git ancestry,
-branch, dirty/untracked files, receipt identity and reported required checks/ACs.
-Scope checks cover additions, modifications, deletions and both sides of renames.
-Control files are always protected. Worktrees are **not a security sandbox**;
-scope is a post-execution review gate, not OS-level enforcement.
+无回执、权限阻塞或非零退出时：
 
-Compact JSON includes SHAs, file count/preview, scope result, reported command
-and acceptance counts, pending review, elapsed time and local evidence paths.
-It does not manufacture individual test counts, token totals or independent PASS.
-Missing evidence remains blocked. Actual test logs should be referenced by the
-executor; collection preserves but does not independently rerun those commands.
+    python .ai/scripts/control.py diagnose TASK-001
 
-Codex reviews selected diffs/tests, writes Core Protocol QA/review artifacts, and
-invokes reviewed transitions. COMPLETE leads only to REVIEW. Human integration stays explicit:
-commit controller artifacts, review/merge the implementation branch, reconcile
-PROJECT_STATE.yaml and preserve the task state. The controller never calls a
-model to review, never merges and never declares DONE.
+先检查运行记录、Worktree 和日志，再显式确认一次交互 recovery。禁止盲目重试或把
+退出码 0 当作成功。REWORK 会保留之前尝试的证据。
 
-## Failures and recovery
+- print 模式退出 0 但没有最终回执时标记 NEEDS_ATTENTION；`diagnose` 只扫描本次日志
+  的有界尾部并输出脱敏分类。
+- NEEDS_ATTENTION 或 LAUNCH_FAILED 经检查后，可明确确认一次
+  `launch --approve --interactive --recover`。初次启动和一次恢复分别保留日志；再次失败停止。
+- 缺失或脏回执可以在保留现场后修正再 collect；范围或证据失败会迁入 BLOCKED。
+- REVIEW 到 READY 会归档旧回执并增加 attempt；准备失败也消耗预算，不能删历史重置。
+- PREPARING/LAUNCHING 中断或锁残留时，先检查 run.json、进程、Worktree 和分支。
+  控制器不保证跨多个文件的崩溃安全事务，也不自动清理或备份运行记录。
 
-- No executable/login: fix the environment; no fake success. Probe exit 2 means
-  discovery failed. Probe does not make a model call.
-- Launcher timeout/nonzero: inspect launch.log. The direct process is terminated
-  on timeout, but descendants/remote work may continue. Do not blindly relaunch.
-- A print-mode exit 0 without a terminal receipt is `NEEDS_ATTENTION` (exit 2),
-  not successful dispatch. Run `diagnose TASK-001`: fixed categories include
-  PERMISSION_BLOCKED, AUTH_REQUIRED, RECEIPT_MISSING/INVALID and
-  NO_COMPLETION_EVIDENCE. Detection scans only bounded tails of this launch's
-  logs and is best-effort; it never prints account/credential log lines. A final
-  receipt remains unverified until collect and independent review.
-- For a stopped NEEDS_ATTENTION/LAUNCH_FAILED run, inspect processes and worktree,
-  then explicitly confirm one recovery with
-  `launch TASK-001 --approve --interactive --recover --executable /path/to/agy`.
-  Each run permits at most two launches (initial plus one interactive recovery),
-  stored separately under `launch-1/` and `launch-2/`. This is distinct from the
-  task's maximum implementation-attempt budget. Failed recovery escalates to
-  review, never an automatic loop. A launch still running cannot be recovered.
-- Launch is one-shot without explicit recovery; manual completion may still be collected
-  after a failed launch. PREPARED can also be completed through the interactive
-  CLI using the generated context without invoking launch.
-- Missing/dirty receipt: fix the executor artifacts and collect again. Scope or
-  failed reported checks move the task to BLOCKED, preserving full evidence.
-- REWORK: REVIEW → READY archives receipts/increments attempt. BLOCKED → READY
-  is manual recovery. Commit controller state before preparing the next attempt.
-- Each preparation consumes one budget slot, including interrupted setup. At the
-  limit escalate to Codex/human; never delete history to conceal failures.
-- Interrupted PREPARING/LAUNCHING or stale delegation.lock: inspect run.json, Git
-  worktrees/branches and processes. Retain user changes and evidence, then perform
-  explicit manual recovery. Crash-safe multi-file transactions are not provided.
-- Automatic worktree cleanup, crash-safe transactions, metrics ingestion and
-  unattended batch scheduling are deferred. Local multi-agent coordination is
-  bounded to two processes and one automatic retry; it is not a remote scheduler.
-
-## Local validation
-
-```sh
-python -m unittest discover -s tests -v
-python -m compileall .ai/scripts .ai/adapters .agents/skills
-```
-
-Tests use temporary Git repositories and a native Python subprocess fixture;
-they do not spend Antigravity quota or demonstrate Gemini coding quality.
-
-Real-task checks on Windows: the agy launcher reported 1.0.10 and interactive
-UI reported runtime 1.1.27. Print mode soft-denied ViewFile and exited 0 with no
-code. Interactive-assisted execution subsequently authored a normalization
-function, six passing test methods and a local commit. Independent review reran
-those six tests and checked fourteen additional inputs, all passing. Collection
-verified three in-scope changed files and moved the task to REVIEW without merge.
-Multiple approvals and corrections were needed, including Windows shell-writing
-failures and out-of-worktree read requests (denied). This validates assisted
-execution, not unattended reliability, coding quality generally, or token savings.
-The newer interactive CLI entry and diagnostics are covered by regression tests;
-do not confuse the earlier manually launched real run with a new end-to-end run.
+离线测试使用临时 Git 仓库和伪 agy，不消耗 Provider 额度，也不能证明真实编码质量、
+无人值守可靠性或 Token 节省。真实效果按 [用量测量](../COST_METRICS.md)记录。

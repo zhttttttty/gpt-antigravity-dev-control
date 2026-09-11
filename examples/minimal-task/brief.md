@@ -1,19 +1,22 @@
-# TASK-EXAMPLE — Greeting helper
+# TASK-EXAMPLE：问候辅助函数
 
-[中文](brief.zh-CN.md)
+## 原因
 
-## Why
-Demonstrate a bounded, independently reviewable task.
+演示一个边界明确、可独立 Review 的任务。
 
-## Objective
-Add one deterministic greeting helper and a targeted test.
+## 目标
 
-## In Scope
-- `src/demo/**`
-- `tests/demo/**`
+增加一个确定性的问候辅助函数和针对性测试。
 
-## Out of Scope
-- architecture, dependencies, deployment
+## 范围内
 
-## Done Looks Like
-- AC-001 has automated evidence.
+- src/demo/**
+- tests/demo/**
+
+## 范围外
+
+- 架构、依赖、部署
+
+## 完成标准
+
+- AC-001 具有自动化证据。

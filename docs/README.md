@@ -7,6 +7,9 @@ below describe how to use it and how it works internally.
 
 ## Use the project
 
+- [Hybrid Orchestration](HYBRID_ORCHESTRATION.md): Plus roles, native/agy routing,
+  shared handoff, capacity limitations and offline configuration checks.
+
 1. [Quick Start](QUICK_START.md) - install dependencies, create a task, route it,
    execute it, review evidence, and close it.
 2. [Control Workflow](CONTROL_WORKFLOW.md) - the complete plan to execute to

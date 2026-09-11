@@ -1,15 +1,15 @@
-# Rollback Plan
+# 回滚计划
 
-Required for high-risk tasks. For lower-risk tasks, write `NOT_REQUIRED` if retained.
+高风险任务必填；低风险任务不需要时填写 `NOT_REQUIRED`。
 
-## Trigger
-- `<condition requiring rollback>`
+## 触发条件
+- `<需要回滚的条件>`
 
-## Steps
-1. `<step>`
+## 步骤
+1. `<步骤>`
 
-## Data / Compatibility Considerations
-- `<impact>`
+## 数据与兼容性
+- `<影响>`
 
-## Verification After Rollback
-- `<check>`
+## 回滚后验证
+- `<检查>`

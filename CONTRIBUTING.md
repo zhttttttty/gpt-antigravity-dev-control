@@ -1,27 +1,21 @@
-# Contributing
+# 贡献指南
 
-[中文](CONTRIBUTING.zh-CN.md)
+欢迎贡献。
 
-Contributions are welcome.
+## 原则
 
-## Principles
+- 保持任务协议向后兼容；破坏性变化必须提供版本化迁移。
+- Executor 必须受 task.yaml 权限和范围约束。
+- 优先相信仓库证据，不直接相信模型声明。
+- 保持本地优先、摘要优先，不向 main 增加远程调度或 Reviewer 服务。
 
-- Keep Core Protocol semantics backward-compatible unless a versioned migration is provided.
-- Keep the executor bounded by `task.yaml` authority.
-- Prefer repository evidence over model claims.
-- Keep the control plane local-first and summary-first; do not add remote scheduling or reviewer
-  services to `main`.
+## 开发检查
 
-## Development
+    python -m pip install -r .ai/scripts/requirements-local.txt
+    python -m compileall .ai/scripts .ai/adapters .agents/skills
+    python .ai/scripts/control.py status
+    python .ai/scripts/control.py --help
+    python -m unittest discover -s tests -v
 
-```bash
-python -m pip install -r .ai/scripts/requirements-local.txt
-python -m compileall .ai/scripts .ai/adapters .agents/skills
-python .ai/scripts/control.py status
-python .ai/scripts/control.py --help
-python -m unittest discover -s tests -v
-```
-
-Before changing task schema, Risk Gates, Receipt formats or state transitions, update documentation and `CHANGELOG.md`.
-
-Use pull requests for non-trivial changes. Include what changed, why, compatibility impact and how it was tested.
+修改任务 Schema、Risk Gate、Receipt 或状态迁移前，先更新文档和 CHANGELOG.md。
+非 trivial 修改使用 Pull Request，并说明变更、原因、兼容性影响和测试结果。

@@ -1,29 +1,24 @@
-# Security Policy
+# 安全策略
 
-[中文](SECURITY.zh-CN.md)
+## 报告问题
 
-## Reporting
+不要在 Issue、任务回执或日志中公开 API Key、GitHub PAT、私有仓库凭据或其他秘密。
+漏洞报告应删除敏感利用数据，并通过仓库维护者指定的私密渠道跟进。
 
-Do not publish API keys, GitHub PATs, private repository credentials or other secrets in issues, task receipts or logs.
+## 秘密处理
 
-For a suspected vulnerability, open a minimal GitHub issue without sensitive exploit data and request a private follow-up channel from the repository owner.
+本地控制平面通过用户的 agy 安装执行。认证信息应保存在 CLI 支持的凭据存储中，
+不要复制到任务契约、上下文包、回执或提交中。
 
-## Secret handling
+.env*、.ai/runtime/ 和本地日志默认被 Git 忽略，但日志可能包含源码片段、路径、Prompt
+或 Provider 诊断，附加到 Issue 前必须脱敏。
 
-The local control plane delegates through the user's agy installation. Keep authentication in
-the CLI's supported credential store; do not copy tokens, account data, or private
-repository credentials into task contracts, context packs, receipts, or commits.
+## 全权限执行
 
-`.env*`, `.ai/runtime/`, and local execution logs are ignored by default. Logs may
-still contain source snippets, paths, prompts, or provider diagnostics; sanitize
-them before attaching them to an issue.
+full-access 只适用于一次性可信 Worktree。它会向 agy 传递跳过确认的参数，但不授予
+管理员权限，也不提供操作系统级沙箱。使用前检查任务范围和 Worktree 内容。
 
-## Full-access execution
+## 高风险变更
 
-`--full-access` is an explicit launch option for a disposable trusted worktree.
-It forwards agy's permission-bypass flag but does not grant administrator rights
-or create an OS sandbox. Review the task scope and worktree contents before use.
-
-## High-risk changes
-
-Authentication, authorization, destructive data behavior, database migrations, deployment topology and breaking public contracts should be classified as high risk and must pass the repository's high-risk gate before merge.
+认证、授权、破坏性数据操作、数据库迁移、部署拓扑和公共契约变化必须标记为高风险，
+并通过仓库的高风险门后才能合并。

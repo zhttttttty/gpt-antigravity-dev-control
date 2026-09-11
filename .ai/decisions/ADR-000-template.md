@@ -1,37 +1,34 @@
-# ADR-XXX — <Decision Title>
+# ADR-XXX：<决策标题>
 
-- Status: Proposed
-- Date: `<YYYY-MM-DD>`
-- Owner: GPT-5.6 Sol / Human
-- Related task: `<TASK-ID>`
+- 状态：待审议
+- 日期：`<YYYY-MM-DD>`
+- 负责人：指定 Codex 架构师或人类
+- 相关任务：`<TASK-ID>`
 
-## Context
-`<why a decision is required>`
+## 背景
+`<为何需要决策>`
 
-## Decision
-`<chosen architecture>`
+## 决策
+`<选择的架构>`
 
-## Alternatives Considered
-1. `<option>`
-2. `<option>`
+## 备选方案
+1. `<方案>`
+2. `<方案>`
 
-## Consequences
-### Positive
-- `<effect>`
+## 影响与取舍
+- 正面影响：`<影响>`
+- 负面影响与代价：`<影响>`
 
-### Negative / Tradeoffs
-- `<effect>`
+## 兼容与迁移
+`<影响>`
 
-## Compatibility / Migration
-`<impact>`
+## 安全与数据
+`<影响>`
 
-## Security / Data Impact
-`<impact>`
+## 回滚
+`<回滚方案>`
 
-## Rollback
-`<rollback plan>`
-
-## Approval
-- Architect: `<approved/pending>`
-- Human approval required: `<yes/no>`
-- Human approval: `<approved/pending/not-required>`
+## 审批
+- 架构师：`<已批准/待审批>`
+- 是否需要人工批准：`<是/否>`
+- 人工审批：`<已批准/待审批/不需要>`

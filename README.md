@@ -43,6 +43,15 @@ new usage should use control.py.
 
 ## Use it inside Codex
 
+The project Plus profile uses Luna max for the root, Luna medium for native
+execution roles and Astra low for independent review. Root chooses native workers
+or local Antigravity under the same contract and risk gates. Native threads are
+capped at two; the combined native/agy budget is root-coordinated, not a shared
+runtime lock. See [Hybrid Orchestration](docs/HYBRID_ORCHESTRATION.md).
+
+With Python 3.11+, run `python .ai/scripts/control.py check-orchestration` to detect
+project configuration drift. This is not runtime model or sandbox verification.
+
 The repository includes a discoverable skill at
 .agents/skills/antigravity-delegate. In a Codex task opened on this checkout,
 invoke $antigravity-delegate. Codex then owns the planning, command execution,
@@ -79,7 +88,7 @@ flowchart TD
 
 | Mode | Use when | Execution |
 |---|---|---|
-| `direct` | Small code/config/documentation changes | Codex or a human implements under the same task contract |
+| `direct` | Root/manual work or bounded native Codex tasks | Root, human or native worker implements; root checks evidence |
 | `delegated` | Bounded multi-file implementation, tests, or refactors | Local agy implements in an isolated worktree |
 | `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then local delegation |
 
@@ -126,7 +135,7 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ## Status
 
-Current version: **3.1.4-local**. The project is a local control workflow; no
+Current version: **3.2.0-local**. The project is a local control workflow; no
 remote scheduler, reviewer API, or fixed token-savings claim is required.
 
 ## License

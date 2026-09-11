@@ -1,10 +1,10 @@
-# Governed Principles
+# 治理原则
 
-1. **Artifacts over memory** — durable project truth lives in files/Git.
-2. **Separate authority** — executor cannot approve itself or rewrite its own scope.
-3. **Risk selects gates** — higher risk increases evidence and approval requirements.
-4. **Fail closed** — missing required evidence is not success.
-5. **Small reversible steps** — prefer bounded tasks with clear rollback.
-6. **Fresh execution context** — reduce drift by starting executor tasks cleanly.
-7. **Exact evidence** — review the exact diff/commit range that was executed and tested.
-8. **Human remains final authority** — especially for high-risk merge decisions.
+1. **文件优先于记忆**：持久事实保存在文件与 Git 中。
+2. **权限分离**：执行者不能自我批准或重写自身范围。
+3. **风险决定门槛**：风险越高，证据与审批要求越高。
+4. **缺证据即拒绝**：必要证据缺失不等于成功。
+5. **小步可回退**：采用有界任务和明确回滚。
+6. **新执行上下文**：通过干净上下文减少偏移。
+7. **精确证据**：审查已执行、已测试的同一 Diff/提交范围。
+8. **人类最终决定**：尤其适用于高风险合并。

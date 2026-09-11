@@ -11,6 +11,17 @@ import sys
 SCRIPT_DIR = Path(__file__).resolve().parent
 CORE = {"create", "validate", "transition", "start", "worktree-create", "worktree-remove"}
 DELEGATION = {"probe", "route", "prepare", "launch", "collect", "diagnose"}
+HELP = """usage: control.py [--repo PATH] COMMAND [ARGS...]
+
+Unified local AI development control plane.
+
+Task protocol commands:
+  init                          initialize minimal target project state
+  create, validate, transition, start, worktree-create, worktree-remove
+
+Local delegation commands:
+  probe, route, prepare, launch, collect, status, diagnose
+"""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
             rest.append(args[i])
         i += 1
     if not rest or rest[0] in {"-h", "--help"}:
-        print("usage: control.py [--repo PATH] COMMAND [ARGS...]\n\nCommands: init, create, validate, route, prepare, launch, collect, status, transition, probe, diagnose")
+        print(HELP)
         return 0
     command = rest[0]
     if command == "init":
@@ -43,12 +54,23 @@ def main(argv: list[str] | None = None) -> int:
     elif command in DELEGATION:
         entry, child = SCRIPT_DIR / "delegate.py", rest
     else:
-        raise SystemExit(f"ERROR: unknown command: {command}")
+        print(f"ERROR: unknown command: {command}", file=sys.stderr)
+        return 2
     old_argv, old_cwd = sys.argv, Path.cwd()
     try:
         os.chdir(repo)
         sys.argv = [str(entry), *child]
-        runpy.run_path(str(entry), run_name="__main__")
+        try:
+            runpy.run_path(str(entry), run_name="__main__")
+        except SystemExit as exc:
+            if isinstance(exc.code, int):
+                return exc.code
+            if exc.code:
+                print(exc.code, file=sys.stderr)
+            return 2
+        except (ValueError, OSError, RuntimeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
     finally:
         sys.argv = old_argv
         os.chdir(old_cwd)

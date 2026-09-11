@@ -34,7 +34,7 @@ CLI 标准输出是文本，不能替代回执。不得自行验收、合并或�
 ## 隔离与风险
 
 `isolation.worktree: true` 时，只在指定 Worktree 执行，采用满足任务的最小改动。
-遵守 `.ai/rules/RISK_GATES.md`，不得自行降低风险：
+遵守 `.agents/skills/antigravity-delegate/references/workflow.md`，不得自行降低风险：
 
 - low：范围检查、执行证据、独立审查与 QA。
 - medium：另需隔离、必要自动化测试与回归证据。

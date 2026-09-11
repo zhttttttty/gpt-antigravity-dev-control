@@ -12,10 +12,10 @@
 
 建立最小可独立验收的任务，定义范围、风险、验收证据、检查命令和 execution.mode。
 
-    python .ai/scripts/control.py create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode direct
+    python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode direct
     # 补齐范围、验收条件和检查命令后再验证
-    python .ai/scripts/control.py validate TASK-001
-    python .ai/scripts/control.py route TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
 
 ## 2. 执行
 
@@ -31,10 +31,10 @@ start --worktree、worktree-create 和 prepare 前提交完整契约及预期修
 - delegated：本地 agy 在准备好的任务 Worktree 中实现。
 - approval_required：先将人工审批绑定到契约，再执行本地委派。
 
-    python .ai/scripts/control.py start TASK-001 --worktree
-    python .ai/scripts/control.py prepare TASK-001 --approve
-    python .ai/scripts/control.py launch TASK-001 --approve --interactive
-    python .ai/scripts/control.py collect TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py start TASK-001 --worktree
+    python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+    python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
 Executor 只能修改可写范围，运行必要检查并写回执，不得自我批准或合并。
 
@@ -72,7 +72,7 @@ DONE 校验 COMPLETE 执行回执、REVIEWED QA、独立真实身份、任务/�
 
 QA、Review 和 Risk Gate 全部通过后：
 
-    python .ai/scripts/control.py transition TASK-001 DONE
+    python .agents/skills/antigravity-delegate/scripts/control.py transition TASK-001 DONE
 
 同步项目状态，保留证据，并明确合并已 Review 的提交。
 REWORK 只执行一次 REVIEW 到 READY，控制器自动归档并增加 attempt。
@@ -94,6 +94,6 @@ V1 布局的项目规格从 `.ai/*.md` 移到 `.ai/project/`；未完成的
 task.yaml、brief、context、回执、review 和 rollback。放入对应状态目录并同步
 PROJECT_STATE.yaml。保留已接受 ADR 和已归档报告，不重写历史证据。
 
-派发前执行 `python .ai/scripts/control.py validate TASK-ID`；中高风险使用
+派发前执行 `python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-ID`；中高风险使用
 Worktree。根 `.gitignore` 已排除 `.worktrees/` 和 `.ai/runtime/`，无需额外片段。
 当前 schema v2 任务无需为混合路由做结构迁移；新模板使用 Plus 偏好，历史身份仍有效。

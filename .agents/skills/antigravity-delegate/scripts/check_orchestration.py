@@ -84,7 +84,15 @@ def validate(root: Path) -> list[str]:
             if not isinstance(data.get(field), str) or not data[field].strip():
                 errors.append(f"{name}.{field}: expected nonempty text")
 
-    task = read(".ai/templates/task/task.yaml")
+    task_path = root / ".ai/templates/task/task.yaml"
+    if not task_path.exists():
+        task_path = Path(__file__).resolve().parents[1] / "templates/task/task.yaml"
+    try:
+        task_data = yaml.safe_load(task_path.read_text(encoding="utf-8"))
+        task = task_data if isinstance(task_data, dict) else {}
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        errors.append(f"task template: {exc}")
+        task = {}
     for role in ("planner", "reviewer"):
         same(f"new task {role}", value(task, "roles", role), value(canonical, "roles", role, "preferred_model"))
     return errors

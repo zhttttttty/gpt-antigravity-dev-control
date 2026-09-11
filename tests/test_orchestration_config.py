@@ -12,7 +12,7 @@ import yaml
 
 
 REPO = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("orchestration_check", REPO / ".ai/scripts/check_orchestration.py")
+SPEC = importlib.util.spec_from_file_location("orchestration_check", REPO / ".agents/skills/antigravity-delegate/scripts/check_orchestration.py")
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
 
@@ -24,13 +24,13 @@ class OrchestrationConfigTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         shutil.copytree(REPO / ".codex", self.root / ".codex")
         (self.root / ".ai/templates/task").mkdir(parents=True)
-        for relative in (".ai/config.yaml", ".ai/templates/task/task.yaml"):
-            shutil.copy2(REPO / relative, self.root / relative)
+        shutil.copy2(REPO / ".ai/config.yaml", self.root / ".ai/config.yaml")
+        shutil.copy2(REPO / ".agents/skills/antigravity-delegate/templates/task/task.yaml", self.root / ".ai/templates/task/task.yaml")
 
     def test_repository_and_cli_agree(self):
         self.assertEqual(CHECK.validate(REPO), [])
         result = subprocess.run(
-            [sys.executable, str(REPO / ".ai/scripts/control.py"), "check-orchestration", "--repo", str(self.root)],
+            [sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/control.py"), "check-orchestration", "--repo", str(self.root)],
             capture_output=True, text=True, timeout=20,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -45,7 +45,7 @@ class OrchestrationConfigTests(unittest.TestCase):
 
     def test_cli_failure_and_help(self):
         (self.root / ".codex/config.toml").unlink()
-        command = [sys.executable, str(REPO / ".ai/scripts/control.py"), "--repo", str(self.root), "check-orchestration"]
+        command = [sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/control.py"), "--repo", str(self.root), "check-orchestration"]
         failed = subprocess.run(command, capture_output=True, text=True, timeout=20)
         self.assertEqual(failed.returncode, 1, failed.stderr)
         self.assertIn('"status": "FAIL"', failed.stdout)

@@ -20,13 +20,13 @@ python .agents/skills/antigravity-delegate/scripts/control.py --repo D:\Projects
 ## Quick start
 
 ```sh
-python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/control.py status
-python .ai/scripts/control.py probe
-python .ai/scripts/control.py --help
+python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
+python .agents/skills/antigravity-delegate/scripts/control.py status
+python .agents/skills/antigravity-delegate/scripts/control.py probe
+python .agents/skills/antigravity-delegate/scripts/control.py --help
 ```
 
-Create a task from `.ai/templates/task/`, then choose its route:
+Create a task from `.agents/skills/antigravity-delegate/templates/task/`, then choose its route:
 
 ```yaml
 execution:
@@ -39,11 +39,11 @@ execution:
 ```
 
 ```sh
-python .ai/scripts/control.py validate TASK-001
-python .ai/scripts/control.py route TASK-001
-python .ai/scripts/control.py prepare TASK-001 --approve
-python .ai/scripts/control.py launch TASK-001 --approve --interactive
-python .ai/scripts/control.py collect TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ```
 
 The older ai.py and delegate.py commands remain compatibility entry points;
@@ -55,9 +55,9 @@ The project Plus profile uses Luna max for the root, Luna medium for native
 execution roles and Astra low for independent review. Root chooses native workers
 or local Antigravity under the same contract and risk gates. Native threads are
 capped at two; the combined native/agy budget is root-coordinated, not a shared
-runtime lock. See [Hybrid Orchestration](docs/HYBRID_ORCHESTRATION.md).
+runtime lock. See [Hybrid Orchestration](.agents/skills/antigravity-delegate/references/orchestration.md).
 
-With Python 3.11+, run `python .ai/scripts/control.py check-orchestration` to detect
+With Python 3.11+, run `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` to detect
 project configuration drift. This is not runtime model or sandbox verification.
 
 The repository includes a discoverable skill at
@@ -101,14 +101,14 @@ flowchart TD
 | `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then local delegation |
 
 All modes share the same state machine, receipts, evidence rules, review gate,
-and human merge authority. See [Execution Modes](docs/EXECUTION_MODES.md).
+and human merge authority. See [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md).
 
 ## Full-access launch
 
 For a disposable trusted worktree only:
 
 ```sh
-python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
 ```
 
 This explicitly passes agy's `--dangerously-skip-permissions`; it does not grant
@@ -128,18 +128,18 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ### Usage
 
-- [Quick Start](docs/QUICK_START.md)
-- [Control Workflow](docs/CONTROL_WORKFLOW.md)
-- [Local Delegation Operations](docs/LOCAL_DELEGATION.md)
+- [Quick Start](.agents/skills/antigravity-delegate/references/workflow.md)
+- [Control Workflow](.agents/skills/antigravity-delegate/references/workflow.md)
+- [Local Delegation Operations](.agents/skills/antigravity-delegate/references/delegation.md)
 
 ### Technical reference
 
-- [Documentation map](docs/README.md)
-- [Execution Modes](docs/EXECUTION_MODES.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Current Limitations](docs/LIMITATIONS.md)
+- [Documentation map](.agents/skills/antigravity-delegate/SKILL.md)
+- [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md)
+- [Architecture](.agents/skills/antigravity-delegate/references/workflow.md)
+- [Current Limitations](.agents/skills/antigravity-delegate/references/delegation.md)
 - [Cost Measurement](COST_METRICS.md)
-- [Risk Gates](.ai/rules/RISK_GATES.md)
+- [Risk Gates](.agents/skills/antigravity-delegate/references/workflow.md)
 
 ## Status
 

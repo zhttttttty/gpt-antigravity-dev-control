@@ -1,8 +1,8 @@
 # Codex 工作流程
 
-正式生命周期维护在[统一控制流程](../../../../docs/CONTROL_WORKFLOW.md)。
+正式生命周期维护在[统一控制流程](workflow.md)。
 按当前阶段阅读，混合执行、精确快照和合计容量见
-[编排规则](../../../../.ai/rules/ORCHESTRATION.md)。
+[编排规则](orchestration.md)。
 
 生命周期命令均针对主控仓库。原生/direct 使用 `start`，
 本地 agy 使用 `prepare/launch/collect`。仅 Root 推进状态；

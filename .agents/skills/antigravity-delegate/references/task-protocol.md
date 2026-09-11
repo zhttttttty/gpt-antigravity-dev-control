@@ -22,7 +22,7 @@ execution:
 原生实现用 `mode: direct`，`roles.executor` 填实际角色（例如 worker），
 不调用 agy Adapter。中高风险必须隔离，低风险也须服从契约的隔离要求。
 Root 派发后核验范围和回执，再执行核心迁移；原生任务不产生 agy 记录，也不交给 collect。
-更换后端不能绕过风险门，见[编排规则](../../../../.ai/rules/ORCHESTRATION.md)。
+更换后端不能绕过风险门，见[编排规则](orchestration.md)。
 
 受控任务由 route 输出契约哈希，人类在版本化任务文件外创建审批 YAML，包含
 task_id、contract_sha256、result: APPROVED、approved_by 和 evidence（ADR/审查引用）。

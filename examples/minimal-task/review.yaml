@@ -1,8 +1,0 @@
-schema_version: 2
-task_id: TASK-EXAMPLE
-attempt: 1
-verdict: null
-summary: null
-findings: []
-follow_up_tasks: []
-state_transition: null

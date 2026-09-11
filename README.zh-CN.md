@@ -18,10 +18,10 @@ python .agents/skills/antigravity-delegate/scripts/control.py --repo D:\Projects
 ## 快速开始
 
 ```powershell
-python -m pip install -r .ai/scripts/requirements-local.txt
-python .ai/scripts/control.py status
-python .ai/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
-python .ai/scripts/control.py --help
+python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
+python .agents/skills/antigravity-delegate/scripts/control.py status
+python .agents/skills/antigravity-delegate/scripts/control.py probe --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .agents/skills/antigravity-delegate/scripts/control.py --help
 ```
 
 每个任务通过 `execution.mode` 选择执行方式：
@@ -47,11 +47,11 @@ execution:
 ## 统一命令入口
 
 ```powershell
-python .ai/scripts/control.py validate TASK-001
-python .ai/scripts/control.py route TASK-001
-python .ai/scripts/control.py prepare TASK-001 --approve
-python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
-python .ai/scripts/control.py collect TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ```
 
 原 ai.py 和 delegate.py 暂时保留为兼容入口，新使用方式统一采用 control.py。
@@ -61,9 +61,9 @@ python .ai/scripts/control.py collect TASK-001
 仓库提供 Plus 项目级配置：Luna max 主控、Luna medium 原生执行、Astra low
 独立审查。Root 可以在原生 worker 与 Antigravity 两种实现路径间选择，仍使用同一套
 `.ai/` 契约与风险门。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
-详见 [混合执行指南](docs/HYBRID_ORCHESTRATION.md)。
+详见 [混合执行指南](.agents/skills/antigravity-delegate/references/orchestration.md)。
 
-使用 Python 3.11+ 执行 `python .ai/scripts/control.py check-orchestration` 可检查
+使用 Python 3.11+ 执行 `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` 可检查
 项目配置一致性；这不代表已验证实际模型路由、额度或沙箱执行。
 
 仓库内置可发现技能：.agents/skills/antigravity-delegate。在当前仓库的
@@ -91,16 +91,16 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 
 ### 使用指南
 
-- [快速开始](docs/QUICK_START.md)
-- [统一控制流程](docs/CONTROL_WORKFLOW.md)
-- [本地委派与恢复](docs/LOCAL_DELEGATION.md)
+- [快速开始](.agents/skills/antigravity-delegate/references/workflow.md)
+- [统一控制流程](.agents/skills/antigravity-delegate/references/workflow.md)
+- [本地委派与恢复](.agents/skills/antigravity-delegate/references/delegation.md)
 
 ### 技术说明
 
-- [文档索引](docs/README.md)
-- [执行模式](docs/EXECUTION_MODES.md)
-- [架构](docs/ARCHITECTURE.md)
-- [当前限制](docs/LIMITATIONS.md)
+- [文档索引](.agents/skills/antigravity-delegate/SKILL.md)
+- [执行模式](.agents/skills/antigravity-delegate/references/orchestration.md)
+- [架构](.agents/skills/antigravity-delegate/references/workflow.md)
+- [当前限制](.agents/skills/antigravity-delegate/references/delegation.md)
 - [用量测量](COST_METRICS.md)
 
 当前版本：**3.2.0-local**。

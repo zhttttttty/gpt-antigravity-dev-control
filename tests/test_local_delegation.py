@@ -12,7 +12,7 @@ from unittest.mock import patch
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / ".ai/scripts"))
+sys.path.insert(0, str(REPO / ".agents/skills/antigravity-delegate/scripts"))
 import delegate as d
 from antigravity_cli import AntigravityCLI, diagnose
 
@@ -30,7 +30,7 @@ class LocalDelegationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="local delegation ")
         self.root = Path(self.temp.name).resolve()
-        shutil.copytree(REPO / ".ai/templates", self.root / ".ai/templates")
+        shutil.copytree(REPO / ".agents/skills/antigravity-delegate/templates", self.root / ".ai/templates")
         shutil.copy(REPO / ".gitignore", self.root / ".gitignore")
         self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
         shutil.copytree(self.root / ".ai/templates/task", self.folder)
@@ -224,7 +224,7 @@ class LocalDelegationTests(unittest.TestCase):
             self.prepare()
 
     def test_cli_prepare_is_single_json_document(self):
-        cp = subprocess.run([sys.executable, str(REPO / ".ai/scripts/delegate.py"),
+        cp = subprocess.run([sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/delegate.py"),
                              "--repo", str(self.root), "prepare", "TASK-TEST", "--approve"],
                             capture_output=True, text=True)
         self.assertEqual(cp.returncode, 0, cp.stderr)
@@ -318,7 +318,7 @@ class LocalDelegationTests(unittest.TestCase):
 
     def test_full_access_requires_approval_at_cli_boundary(self):
         self.prepare()
-        cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+        cp = subprocess.run([sys.executable, str(REPO / '.agents/skills/antigravity-delegate/scripts/delegate.py'),
                              '--repo', str(self.root), 'launch', 'TASK-TEST', '--full-access'],
                             capture_output=True, text=True)
         self.assertEqual(cp.returncode, 2)
@@ -352,7 +352,7 @@ class LocalDelegationTests(unittest.TestCase):
     def test_status_available_while_mutation_lock_held(self):
         self.prepare()
         with d.lock(self.root):
-            cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+            cp = subprocess.run([sys.executable, str(REPO / '.agents/skills/antigravity-delegate/scripts/delegate.py'),
                                  '--repo', str(self.root), 'status', 'TASK-TEST'],
                                 capture_output=True, text=True)
         self.assertEqual(cp.returncode, 0, cp.stderr)
@@ -362,7 +362,7 @@ class LocalDelegationTests(unittest.TestCase):
         self.prepare()
         argsfile = self.root / '.ai/runtime/argv.json'
         argsfile.write_text(json.dumps(['-c', "print('not completion')"]))
-        cp = subprocess.run([sys.executable, str(REPO / '.ai/scripts/delegate.py'),
+        cp = subprocess.run([sys.executable, str(REPO / '.agents/skills/antigravity-delegate/scripts/delegate.py'),
                              '--repo', str(self.root), 'launch', 'TASK-TEST', '--approve',
                              '--executable', sys.executable, '--args-file', str(argsfile)],
                             capture_output=True, text=True)

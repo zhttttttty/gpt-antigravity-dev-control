@@ -11,10 +11,10 @@
 
 ## 开发检查
 
-    python -m pip install -r .ai/scripts/requirements-local.txt
+    python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
     python -m compileall .ai/scripts .ai/adapters .agents/skills
-    python .ai/scripts/control.py status
-    python .ai/scripts/control.py --help
+    python .agents/skills/antigravity-delegate/scripts/control.py status
+    python .agents/skills/antigravity-delegate/scripts/control.py --help
     python -m unittest discover -s tests -v
 
 修改任务 Schema、Risk Gate、Receipt 或状态迁移前，先更新文档和 CHANGELOG.md。

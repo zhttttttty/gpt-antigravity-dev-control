@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / ".ai/scripts"))
+sys.path.insert(0, str(REPO / ".agents/skills/antigravity-delegate/scripts"))
 import ai
 from task_data import read_yaml, write_yaml, parse_yaml, digest
 
@@ -19,7 +19,7 @@ class TaskProtocolTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="task protocol ")
         self.root = Path(self.temp.name).resolve()
-        shutil.copytree(REPO / ".ai/templates", self.root / ".ai/templates")
+        shutil.copytree(REPO / ".agents/skills/antigravity-delegate/templates", self.root / ".ai/templates")
         shutil.copy(REPO / ".gitignore", self.root / ".gitignore")
         self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
         shutil.copytree(self.root / ".ai/templates/task", self.folder)
@@ -198,7 +198,7 @@ class TaskProtocolTests(unittest.TestCase):
         self.assertFalse((self.root / ".worktrees").exists())
 
     def test_unified_cli_create_and_direct_status(self):
-        command = [sys.executable, str(REPO / ".ai/scripts/control.py"), "--repo", str(self.root)]
+        command = [sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/control.py"), "--repo", str(self.root)]
         result = subprocess.run(command + ["create", "TASK-NEW", "--title", "CLI task", "--objective", "Check CLI"],
                                 text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)

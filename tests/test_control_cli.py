@@ -7,7 +7,7 @@ import unittest
 
 
 REPO = Path(__file__).resolve().parents[1]
-CONTROL = REPO / ".ai" / "scripts" / "control.py"
+CONTROL = REPO / ".agents" / "skills" / "antigravity-delegate" / "scripts" / "control.py"
 
 
 class UnifiedControlCLITests(unittest.TestCase):

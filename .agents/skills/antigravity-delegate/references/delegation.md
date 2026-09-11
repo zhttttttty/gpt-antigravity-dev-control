@@ -8,13 +8,13 @@ Codex 在仓库内执行，不需要 Hermes、远程 Reviewer API 或后台调�
 本地 agy 生命周期需要 Python 3.10+ 和 Git；运行 check-orchestration 或完整项目
 测试集时使用 Python 3.11+。
 
-    python -m pip install -r .ai/scripts/requirements-local.txt
-    python .ai/scripts/control.py --help
-    python .ai/scripts/control.py probe
+    python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
+    python .agents/skills/antigravity-delegate/scripts/control.py --help
+    python .agents/skills/antigravity-delegate/scripts/control.py probe
 
 Windows 上 agy 不在 PATH 时：
 
-    python .ai/scripts/control.py probe --executable C:\path\to\agy.exe
+    python .agents/skills/antigravity-delegate/scripts/control.py probe --executable C:\path\to\agy.exe
 
 探测会检查 `--version`、`--help`、`agent`、`agents` 和 `agent list`，并从帮助文本
 动态解析实际参数与模式。不要假设固定版本，也不要把控制器的 `direct` 当成 agy
@@ -28,7 +28,7 @@ Adapter 默认从隔离 Worktree 运行，非交互模式使用 `-p <prompt>`，
 
 ## 交互执行
 
-    python .ai/scripts/control.py launch TASK-001 --approve --interactive --executable /path/to/agy
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --executable /path/to/agy
 
 必须在真实终端中运行，不要重定向 stdin/stdout。启动后让 Executor 完成契约、测试
 和 receipt，然后退出 agy，回到 Codex 执行 collect。
@@ -40,7 +40,7 @@ agy.log 可能含路径、Prompt 或私有代码，应只保存在本地并在�
 
 可信的一次性 Worktree 可以显式使用：
 
-    python .ai/scripts/control.py launch TASK-001 --approve --interactive --full-access
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
 
 该选项只向 agy 传递 permission-bypass 参数，不授予管理员权限，也不会移除 Scope、
 Receipt、Review 或人工合并门。永远不要静默启用。
@@ -76,12 +76,12 @@ Receipt、Review 或人工合并门。永远不要静默启用。
 再提交契约。主控工作区必须干净，`isolation.base_branch` 必须解析为包含该契约的当前
 HEAD；本地委派始终要求 Worktree 隔离。持久依赖必须已是 DONE 或 ARCHIVED。
 
-    python .ai/scripts/control.py validate TASK-001
-    python .ai/scripts/control.py route TASK-001
-    python .ai/scripts/control.py prepare TASK-001 --approve
-    python .ai/scripts/control.py launch TASK-001 --approve --interactive
-    python .ai/scripts/control.py status TASK-001
-    python .ai/scripts/control.py collect TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+    python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
 prepare 会创建隔离 Worktree、记录基础提交和契约摘要，并写入上下文包。collect 会
 检查 Git 祖先关系、分支状态、变更范围、回执身份、检查命令和验收证据。
@@ -111,7 +111,7 @@ review.yaml。高风险任务还必须满足额外 Risk Gate 和人工审批。
 
 无回执、权限阻塞或非零退出时：
 
-    python .ai/scripts/control.py diagnose TASK-001
+    python .agents/skills/antigravity-delegate/scripts/control.py diagnose TASK-001
 
 先检查运行记录、Worktree 和日志，再显式确认一次交互 recovery。禁止盲目重试或把
 退出码 0 当作成功。REWORK 会保留之前尝试的证据。

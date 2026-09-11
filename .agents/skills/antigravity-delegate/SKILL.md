@@ -27,7 +27,7 @@ Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供�
 
 ## 混合执行
 
-选择或混用后端时阅读[编排规则](../../../.ai/rules/ORCHESTRATION.md)。
+选择或混用后端时阅读[编排规则](references/orchestration.md)。
 使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
 默认 Luna max 主控、Luna medium 原生执行、Astra low 独立审查。
 用户或运行时的明确选择优先，报告实际使用情况。
@@ -85,7 +85,7 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
 Worktree 内任务文件为快照。原生/direct 证据经 Root 写入输出的主控回执路径。
 DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
 
-按当前阶段阅读[统一控制流程](../../../docs/CONTROL_WORKFLOW.md)、
+按当前阶段阅读[统一控制流程](references/workflow.md)、
 [执行模式](references/execution-modes.md)、[审查契约](references/review-contract.md)
 或[故障恢复](references/failure-recovery.md)；状态和回执说明见
 [任务协议](references/task-protocol.md)、[回执协议](references/receipt-protocol.md)

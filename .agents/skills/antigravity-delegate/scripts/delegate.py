@@ -18,7 +18,7 @@ import yaml
 import ai
 from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "adapters"))
 from antigravity_cli import AntigravityCLI, diagnose
 from executor_interface import Executor
 

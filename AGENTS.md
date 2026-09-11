@@ -21,8 +21,8 @@
 
 对已初始化的目标项目，读取其状态和相关项目规格、ADR。本控制器模板中的
 `.ai/project/` 和项目状态文件含有接入占位内容，不代表实际产品需求。维护控制器时，
-以 `docs/ARCHITECTURE.md` 和控制器测试为依据，按阶段读取
-`docs/CONTROL_WORKFLOW.md` 中的正式流程。
+以 `.agents/skills/antigravity-delegate/references/workflow.md` 和控制器测试为依据，按阶段读取
+`.agents/skills/antigravity-delegate/references/workflow.md` 中的正式流程。
 
 ## 必须遵守的规则
 
@@ -31,7 +31,7 @@
 3. 架构受控变更须先获得指定架构师或人类批准。
 4. 声明不是证据，必须记录命令、结果和变更文件。
 5. 执行者的 `COMPLETE` 不等于审查者的 `PASS`。
-6. 高风险工作必须满足 `.ai/rules/RISK_GATES.md`。
+6. 高风险工作必须满足 `.agents/skills/antigravity-delegate/references/workflow.md`。
 7. 每个任务或尝试优先使用新的执行上下文。
 8. 契约要求 Worktree 时必须隔离执行。
 9. 必要证据不可用时记录 `NOT_RUN`、`UNKNOWN` 或 `BLOCKED`，不得推断成功。
@@ -65,7 +65,7 @@ BLOCKED -> READY
 DONE -> ARCHIVED(archive)
 ```
 
-完整合法迁移见 `.ai/rules/STATE_MACHINE.md`。
+完整合法迁移见 `.agents/skills/antigravity-delegate/references/workflow.md`。
 
 ## 完成标准
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import shutil
 import unittest
 
 
@@ -11,6 +13,16 @@ CONTROL = REPO / ".agents" / "skills" / "antigravity-delegate" / "scripts" / "co
 
 
 class UnifiedControlCLITests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.project = Path(self.temp.name)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.project)], check=True)
+        subprocess.run([sys.executable, str(CONTROL), "init", "--repo", str(self.project)], check=True,
+                       capture_output=True, text=True)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
     def run_control(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(CONTROL), *args],
@@ -27,7 +39,7 @@ class UnifiedControlCLITests(unittest.TestCase):
         self.assertIn("Local delegation commands", result.stdout)
 
     def test_status_without_task_uses_protocol_status(self):
-        result = self.run_control("--repo", str(REPO), "status")
+        result = self.run_control("--repo", str(self.project), "status")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("READY", result.stdout)
         self.assertIn("ARCHIVED", result.stdout)

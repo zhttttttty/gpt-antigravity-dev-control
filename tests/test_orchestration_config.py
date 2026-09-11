@@ -12,6 +12,7 @@ import yaml
 
 
 REPO = Path(__file__).resolve().parents[1]
+FIXTURE = REPO / "tests/fixtures/control-project"
 SPEC = importlib.util.spec_from_file_location("orchestration_check", REPO / ".agents/skills/antigravity-delegate/scripts/check_orchestration.py")
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
@@ -22,13 +23,13 @@ class OrchestrationConfigTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        shutil.copytree(REPO / ".codex", self.root / ".codex")
+        shutil.copytree(FIXTURE / ".codex", self.root / ".codex")
         (self.root / ".ai/templates/task").mkdir(parents=True)
-        shutil.copy2(REPO / ".ai/config.yaml", self.root / ".ai/config.yaml")
-        shutil.copy2(REPO / ".agents/skills/antigravity-delegate/templates/task/task.yaml", self.root / ".ai/templates/task/task.yaml")
+        shutil.copy2(FIXTURE / ".ai/config.yaml", self.root / ".ai/config.yaml")
+        shutil.copy2(FIXTURE / ".ai/templates/task/task.yaml", self.root / ".ai/templates/task/task.yaml")
 
     def test_repository_and_cli_agree(self):
-        self.assertEqual(CHECK.validate(REPO), [])
+        self.assertEqual(CHECK.validate(FIXTURE), [])
         result = subprocess.run(
             [sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/control.py"), "check-orchestration", "--repo", str(self.root)],
             capture_output=True, text=True, timeout=20,
@@ -73,7 +74,7 @@ class OrchestrationConfigTests(unittest.TestCase):
         path = self.root / ".ai/config.yaml"
         for policy in (["invalid"], {"native_subagent_limit": True, "combined_execution_limit": 0}):
             with self.subTest(policy=policy):
-                data = yaml.safe_load((REPO / ".ai/config.yaml").read_text(encoding="utf-8"))
+                data = yaml.safe_load((FIXTURE / ".ai/config.yaml").read_text(encoding="utf-8"))
                 data["orchestration"] = policy
                 path.write_text(yaml.safe_dump(data), encoding="utf-8")
                 self.assertIn("expected a positive integer", "\n".join(CHECK.validate(self.root)))

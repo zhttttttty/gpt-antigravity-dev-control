@@ -5,6 +5,23 @@ description: "在原生 Codex 角色与本地 Antigravity CLI 之间分配有界
 
 # 原生与 Antigravity 委派控制
 
+本目录就是可复制的 Skill 包。控制器、任务模板、项目模板和参考协议都随 Skill
+分发；目标业务仓库只保存由 `init` 生成的最小 `.ai/` 运行状态。旧项目中已有的
+`.ai/scripts` 仍可兼容运行，但新项目不要复制整套控制平面。
+
+## 首次接入
+
+从 Skill 包运行：
+
+    python .agents/skills/antigravity-delegate/scripts/control.py init --repo PATH
+
+可选安装推荐的 Codex 角色配置：
+
+    python .agents/skills/antigravity-delegate/scripts/control.py init --repo PATH --install-codex-profile
+
+初始化只创建 `.ai/tasks`、`.ai/project`、`.ai/templates/task`、`.ai/state` 和被 Git
+忽略的 `.ai/runtime`，不会覆盖已有文件。初始化后提交 `.ai` 中的契约模板与项目说明。
+
 Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供确定性的本地执行协议，
 不是远程调度器，也不能静默替换普通 Codex 子任务。
 
@@ -61,7 +78,7 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
 
 ## 仓库入口
 
-    python .ai/scripts/control.py <command>
+    python .agents/skills/antigravity-delegate/scripts/control.py <command>
 
 用 `create TASK-ID --title ... --objective ...` 生成任务，补齐并验证契约。
 创建 Worktree 前提交契约，基线必须等于 HEAD。状态命令在主控仓库执行，
@@ -78,5 +95,5 @@ DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
 实际模型和角色以运行证据为准，不能由 TOML 推断。保留 Skill 名称，兼容
 `$antigravity-delegate` 调用。
 
-本 Skill 依赖目标仓库的 `.ai/` 控制平面。安装在仓库外时，从目标仓库解析这些引用，
-而非全局 Skill 目录。协议或入口缺失时报告前置条件，不静默生成或安装。
+本 Skill 自带控制器和模板；执行时通过 `--repo` 指向目标仓库。目标仓库必须是 Git
+仓库。协议或入口缺失时报告前置条件；只有显式调用 `init` 才会生成运行状态。

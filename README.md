@@ -9,6 +9,14 @@ high-risk work and merge**.
 There is one task protocol and one primary CLI. Per-task `execution.mode` selects
 direct implementation, local delegation, or approval-required delegation.
 
+The primary deliverable is `.agents/skills/antigravity-delegate`. Copy that Skill into
+another Git project and initialize only its minimal `.ai/` runtime state:
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
+python .agents/skills/antigravity-delegate/scripts/control.py --repo D:\Projects\my-app create TASK-001 --title "Bounded change" --objective "Observable result"
+```
+
 ## Quick start
 
 ```sh

@@ -7,6 +7,14 @@
 
 项目只有一套任务协议和一个主要命令入口，通过 `execution.mode` 选择直接执行、本地委派或审批后委派。
 
+本仓库的主要交付物是 `.agents/skills/antigravity-delegate`。将该目录作为 Skill
+复制到其他 Git 项目后，只需生成最小 `.ai/` 运行状态：
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
+python .agents/skills/antigravity-delegate/scripts/control.py --repo D:\Projects\my-app create TASK-001 --title "有界修改" --objective "可观察的结果"
+```
+
 ## 快速开始
 
 ```powershell

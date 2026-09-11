@@ -1,0 +1,13 @@
+# Project-scoped Codex defaults.
+# The repository control plane remains the source of truth for task state, scope,
+# receipts, and review. This file only provides model and role routing defaults.
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "medium"

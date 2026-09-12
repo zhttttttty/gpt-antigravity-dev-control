@@ -66,6 +66,53 @@ invoke $antigravity-delegate. Codex then owns the planning, command execution,
 receipt collection, review, and recovery flow; agy is started only as the local
 implementation subprocess.
 
+### Invocation
+
+Invoke the Skill directly in a Codex task:
+
+```text
+Use $antigravity-delegate to complete this feature:
+add email verification to the login flow and include tests.
+```
+
+To request the local Antigravity backend explicitly:
+
+```text
+Use $antigravity-delegate, delegate the implementation to Antigravity,
+work in an isolated Git worktree, and return the test results and receipt path.
+```
+
+For a standalone Git project, initialize the minimal runtime state and probe the
+local executable first:
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
+Set-Location D:\Projects\my-app
+python .agents/skills/antigravity-delegate/scripts/control.py probe
+```
+
+Create, validate, route, and run a bounded task:
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 `
+  --title "Add email verification login" `
+  --objective "Add verification checks and tests" `
+  --risk medium `
+  --mode delegated
+
+python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
+```
+
+`route` returns `direct`, `delegated`, or `approval_required`. High-risk work
+must pass its approval gate first. A successful `collect` moves the task to
+review; it does not merge changes or declare the task complete. If `agy` is not
+on `PATH`, run `probe --executable <path-to-agy>`.
+
 Codex may select the Skill automatically for bounded multi-file work. Multi-agent
 runs use a dependency DAG, two concurrent agents by default, up to four for
 large read-only workloads after a healthy ramp-up, separate Worktrees for

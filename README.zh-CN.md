@@ -70,6 +70,51 @@ python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执行、回执收集、
 验收和恢复；agy 只作为 Codex 启动的本地实现子进程。
 
+### 调用方式
+
+在 Codex 对话中直接说明：
+
+```text
+使用 $antigravity-delegate 完成这个功能：
+为用户登录模块增加邮箱验证码校验，并补充测试。
+```
+
+如果希望明确交给本地 Antigravity，可补充：
+
+```text
+使用 $antigravity-delegate，将任务交给 Antigravity 子代理，
+在隔离 Worktree 中完成，并返回测试结果和回执路径。
+```
+
+在目标 Git 项目中，也可以直接运行控制器。首次接入只需初始化最小运行状态：
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
+Set-Location D:\Projects\my-app
+python .agents/skills/antigravity-delegate/scripts/control.py probe
+```
+
+创建并执行一个有界任务：
+
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 `
+  --title "增加邮箱验证码登录" `
+  --objective "增加验证码校验并补充测试" `
+  --risk medium `
+  --mode delegated
+
+python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
+```
+
+`route` 返回 `direct`、`delegated` 或 `approval_required`。高风险任务必须先完成审批；
+`collect` 成功只表示进入待审查状态，不会自动合并或宣布任务完成。执行前可用
+`control.py probe --executable <agy路径>` 检查本机 `agy` 是否可用。
+
 对于边界明确的多文件任务，Codex 可以自动选择该 Skill。多代理运行支持依赖 DAG、
 默认两个并发、大型只读任务健康探测后最多四个并发、独立写入 Worktree、失败一次后降为单并发重试，以及
 `summary.json`/`handoff.md` 精简验收交接。

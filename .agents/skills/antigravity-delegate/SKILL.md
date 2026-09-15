@@ -28,6 +28,8 @@ Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供�
 ## 混合执行
 
 选择或混用后端时阅读[编排规则](references/orchestration.md)。
+需要可复制的完整流程、分阶段和高风险调用模板时阅读
+[调用提示词](references/invocation-prompts.md)。
 使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
 默认 Sol high 作为唯一规划与最终决策主控，Luna high 负责有界只读探索、独立测试与
 审查，Antigravity 作为有界任务的默认实现后端。原生 Luna worker 只在 agy 不可用且
@@ -94,7 +96,8 @@ DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
 [执行模式](references/execution-modes.md)、[审查契约](references/review-contract.md)
 或[故障恢复](references/failure-recovery.md)；状态和回执说明见
 [任务协议](references/task-protocol.md)、[回执协议](references/receipt-protocol.md)
-与[Codex 流程](references/codex-workflow.md)。
+与[Codex 流程](references/codex-workflow.md)。提示词示例见
+[调用提示词](references/invocation-prompts.md)。
 
 修改配置默认值后运行 `control.py check-orchestration`，它只检查仓库一致性。
 实际模型和角色以运行证据为准，不能由 TOML 推断。保留 Skill 名称，兼容

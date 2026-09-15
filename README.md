@@ -186,6 +186,7 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ### Usage
 
+- [Invocation Prompts: Sol + Luna + Antigravity](.agents/skills/antigravity-delegate/references/invocation-prompts.md)
 - [Quick Start](.agents/skills/antigravity-delegate/references/workflow.md)
 - [Control Workflow](.agents/skills/antigravity-delegate/references/workflow.md)
 - [Local Delegation Operations](.agents/skills/antigravity-delegate/references/delegation.md)

@@ -141,6 +141,7 @@ python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 
 ### 使用指南
 
+- [调用提示词：Sol + Luna + Antigravity](.agents/skills/antigravity-delegate/references/invocation-prompts.md)
 - [快速开始](.agents/skills/antigravity-delegate/references/workflow.md)
 - [统一控制流程](.agents/skills/antigravity-delegate/references/workflow.md)
 - [本地委派与恢复](.agents/skills/antigravity-delegate/references/delegation.md)

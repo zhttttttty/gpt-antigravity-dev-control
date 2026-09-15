@@ -2,8 +2,8 @@
 
 [English](README.md)
 
-统一流程：**Codex 规划与验收 → 按任务路由直接实施或交给本地 Antigravity →
-精简回执 → 人工合并**。
+统一流程：**Sol high 决策与计划 → Luna high 探索/核验 → 本地 Antigravity 实现 →
+Sol 最终验收 → 人工合并**。
 
 项目只有一套任务协议和一个主要命令入口，通过 `execution.mode` 选择直接执行、本地委派或审批后委派。
 
@@ -58,9 +58,10 @@ python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
 ## 在 Codex 中使用
 
-仓库提供 Plus 项目级配置：Luna max 主控、Luna medium 原生执行、Astra low
-独立审查。Root 可以在原生 worker 与 Antigravity 两种实现路径间选择，仍使用同一套
-`.ai/` 契约与风险门。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
+仓库提供 Plus 项目级配置：Sol high 是唯一规划、架构和最终验收主控，Luna high
+负责有界只读探索、独立测试与审查，本地 Antigravity 是 delegated/approval_required
+的默认实现者。原生 Luna worker 仅在 agy 不可用或不适用、Root 记录原因并明确批准
+切换为 direct 后作为回退。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
 详见 [混合执行指南](.agents/skills/antigravity-delegate/references/orchestration.md)。
 
 使用 Python 3.11+ 执行 `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` 可检查
@@ -85,6 +86,10 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 使用 $antigravity-delegate，将任务交给 Antigravity 子代理，
 在隔离 Worktree 中完成，并返回测试结果和回执路径。
 ```
+
+默认角色分工是：Luna explorer 先提供代码路径与风险证据，Sol 据此创建任务契约；
+agy 作为唯一写入者实现并退出后，Luna tester/reviewer 串行核验同一快照，最后由 Sol
+复核 Diff、测试和回执并决定 PASS、REWORK 或 BLOCKED。任何代理都不会自动合并。
 
 在目标 Git 项目中，也可以直接运行控制器。首次接入只需初始化最小运行状态：
 
@@ -148,4 +153,4 @@ python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 - [当前限制](.agents/skills/antigravity-delegate/references/delegation.md)
 - [用量测量](COST_METRICS.md)
 
-当前版本：**3.2.0-local**。
+当前版本：**3.3.0-local**。

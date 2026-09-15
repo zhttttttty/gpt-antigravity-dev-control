@@ -39,7 +39,7 @@ class OrchestrationConfigTests(unittest.TestCase):
 
     def test_detects_wrong_reviewer_model_and_write_access(self):
         path = self.root / ".codex/agents/reviewer.toml"
-        path.write_text(path.read_text(encoding="utf-8").replace('"gpt-6-astra"', '"gpt-5.6-luna"').replace('"read-only"', '"workspace-write"'), encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8").replace('"gpt-5.6-luna"', '"gpt-5.6-terra"').replace('"read-only"', '"workspace-write"'), encoding="utf-8")
         errors = "\n".join(CHECK.validate(self.root))
         self.assertIn("reviewer.model:", errors)
         self.assertIn("reviewer.sandbox_mode:", errors)

@@ -3,15 +3,20 @@
 一个 Root 负责路由、契约、容量和集成。`.ai/` 是规范来源；
 `.codex/` 模型默认值不授予权限，也不替代风险门。
 
+默认角色为 Sol high Root、Luna high explorer/researcher/tester/reviewer，以及本地
+Antigravity 实现者。Sol 是唯一规划、架构和最终验收决策者；Luna 返回事实、测试证据
+和审查建议；agy 是 delegated/approval_required 的唯一写入者。
+
 ## 选择执行者
 
 - Root 直接执行：局部小修改，或协调成本大于收益的任务，仍保留必要独立审查。
-- 原生 Codex：explorer/researcher 收集事实，worker 有界实现，tester 独立验证，
-  reviewer 返回发现。使用真实 `spawn_agent` 并保留返回身份。
+- 原生 Codex：Luna high explorer/researcher 收集事实，tester 独立验证，reviewer
+  返回发现。worker 仅是 agy 不可用后的显式回退。使用真实 `spawn_agent` 并保留返回身份。
 - 本地 Antigravity：具有可执行验收条件、值得承担准备和隔离成本的有界实现。
   先探测 agy，再执行既有 prepare/launch/collect 和审批流程。
 
-原生实现使用 `execution.mode: direct`，`roles.executor` 填 worker 等实际角色；
+原生实现使用 `execution.mode: direct`，`roles.executor` 填 worker 等实际角色；切换前
+必须记录 agy 不可用或不适用的原因，并由 Sol Root 明确批准，不能静默降级。
 direct 不启用 `execution.adapter: antigravity_cli`。需隔离时先运行
 `control.py start TASK --worktree`，将返回且核实的 Worktree 交给原生代理。
 控制器不自动派发原生代理或收集其回执，由 Root 核验范围与必要证据后请求迁入 REVIEW。
@@ -20,7 +25,7 @@ direct 不启用 `execution.adapter: antigravity_cli`。需隔离时先运行
 本地使用 route 解析出的 delegated 或 approval_required，执行模型属于 agy 设置。
 不引入新模式或原生 Adapter。架构与风险审批也适用于原生执行，更换后端不能绕过门槛。
 
-仅选择有实际独立工作的角色。agy 已是真实委派，不额外启动 Luna 转发。
+仅选择有实际独立工作的角色。agy 已是真实委派，不额外启动 Luna 转发或 Luna worker。
 原生代理不得启动 agy 或嵌套调度器；两种后端仅由 Root 管理。
 
 ## 派发与交接
@@ -41,6 +46,9 @@ direct 不启用 `execution.adapter: antigravity_cli`。需隔离时先运行
 tester 和 reviewer 必须核验同一快照：记录 HEAD、工作区 Diff/状态和新增文件；
 未提交工作仅有 HEAD 不够。实现、会写文件的测试及审查串行进行。
 后续改动使相关证据失效，验收前须重新验证新快照。
+
+Luna reviewer 只能返回 PASS、PASS_WITH_NOTES、REWORK 或 BLOCKED 建议。Sol Root
+复核契约、Diff、测试和回执后作最终判断；不得把 Luna 建议直接写成 Root 已完成验收。
 
 ## 容量与所有权
 
@@ -63,6 +71,7 @@ agy 启动器自身限制仍适用。
 再选择可用路径。部分写入后先检查并保留证据，不在状态不明的目录启动竞争写入者。
 本地恢复沿用重试和审批限制，反复失败或范围/风险未决时停止，不嵌套自动重试循环。
 
-Astra low 仅为默认值，不保证审查深度足够。按风险提高推理档位或请求专业/人工审查。
+Luna high 是默认审查偏好，不保证对专业领域或高风险任务足够。按风险请求专业、额外
+跨家族或人工审查。
 高风险保留事前审查、回滚、跨家族二次审查或有记录的人工豁免及人工合并审批。
 Gemini 实现不等于 Gemini 已独立审查。修复重要发现后重新验证快照。

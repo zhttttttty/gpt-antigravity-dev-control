@@ -29,10 +29,13 @@ Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供�
 
 选择或混用后端时阅读[编排规则](references/orchestration.md)。
 使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
-默认 Luna max 主控、Luna medium 原生执行、Astra low 独立审查。
+默认 Sol high 作为唯一规划与最终决策主控，Luna high 负责有界只读探索、独立测试与
+审查，Antigravity 作为有界任务的默认实现后端。原生 Luna worker 只在 agy 不可用且
+Root 明确记录原因并批准切换后端时作为回退。
 用户或运行时的明确选择优先，报告实际使用情况。
 
-按范围和协调成本选择 Root 直接执行、原生 Codex 或本地 agy。
+小型低风险修改可由 Root 直接执行；边界明确的多文件实现默认使用本地 agy。
+Luna 的调查与审查输出是证据和建议，不能代替 Sol 的任务契约或最终结论。
 原生任务使用真实 `spawn_agent` 和 direct 协议，agy 使用 `control.py`；
 不要仅为转发 agy 启动原生代理，也不要对原生任务套用 agy 的 launch/collect。
 
@@ -45,7 +48,8 @@ Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供�
 
 Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
 
-- `direct`：小型修改、简短文档或配置、边界未明确的探索，或需要持续交互推理的工作。
+- `direct`：小型修改、简短文档或配置，或需要持续交互推理的工作；原生 worker
+  仅作为明确批准的故障回退，不能静默替代 agy。
 - `delegated`：有界多文件实现、补充测试、独立重构或可通过命令核验的仓库审查。
 - `approval_required`：架构、认证、安全、迁移、部署、计费、破坏性或其他高风险工作。
 - 探测失败或准备与审查成本可能超过实现成本时，保持直接执行。
@@ -72,7 +76,8 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
    独立写入使用独立 Worktree；本地启动器只约束自身任务，最多重试一次，首次失败后降为单并发。
 4. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
    先运行 `collect_reports.ps1` 阅读摘要，再按需打开完整证据。
-5. 独立核验全部 P0/P1 的路径行号、测试、验收和覆盖计数及 Worktree 状态，
+5. agy 完全退出后再串行启动 Luna tester/reviewer；独立核验全部 P0/P1 的路径行号、
+   测试、验收和覆盖计数及 Worktree 状态，
    将发现标记为确认、条件成立或假设。收集不会自动合并或迁入 DONE。
 6. 使用 `cleanup_worktree.ps1` 清理；只有干净 Worktree 可移除，强制清理需明确批准。
 

@@ -1,5 +1,14 @@
 # 变更记录
 
+## 3.3.0-local - 2026-09-15
+
+- 将 Plus 项目默认值调整为 Sol high 唯一规划/最终决策主控、Luna high 探索/测试/审查，
+  本地 Antigravity 作为 delegated 与 approval_required 的默认实现者。
+- 将原生 Luna worker 收窄为 agy 不可用或不适用时的显式回退；要求记录原因、修改路由，
+  禁止静默降级或使用 Luna 作为 agy 转发层。
+- 要求 agy 退出后串行执行 Luna tester/reviewer，并由 Sol 复核证据后给出最终结论。
+- 同步 Codex 配置、角色模板、任务身份、离线配置夹具、中英文文档和 ADR-003。
+
 ## 3.2.0-local - 2026-09-11
 
 - 文档语言统一：所有 README 保留中英双版本，其余维护文档使用中文内容和固定 `.md` 路径；

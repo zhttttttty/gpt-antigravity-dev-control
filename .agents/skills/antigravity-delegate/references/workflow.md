@@ -2,9 +2,9 @@
 
 ## 角色
 
-- Codex Root（默认 Luna max）：需求、架构、任务契约、路由和集成。
-- 原生角色（默认 Luna medium）：有界探索、实现、测试和调研。
-- 独立 Reviewer（默认 Astra low）：返回发现与验收建议，由 Root 记录治理文件。
+- Codex Root（默认 Sol high）：唯一负责需求、架构、任务契约、路由、集成和最终验收。
+- 原生 Luna high：有界只读探索、调研、独立测试和审查；worker 仅作显式故障回退。
+- 独立 Reviewer（默认 Luna high）：返回发现与验收建议，由 Sol Root 复核并记录治理文件。
 - Antigravity / Gemini：在 Worktree 中完成受限实现并生成执行证据。
 - Human：高风险审批和最终合并。
 
@@ -27,7 +27,7 @@
 start --worktree、worktree-create 和 prepare 前提交完整契约及预期修改，保持主控工作区
 干净，配置的基线必须等于当前 HEAD。基线不存在、落后或 direct 分支已存在时会报错。
 
-- direct：Root、人工或原生 Codex worker 在契约范围内实现。
+- direct：Root、人工或经 Sol Root 明确批准的原生 Codex worker 在契约范围内实现。
 - delegated：本地 agy 在准备好的任务 Worktree 中实现。
 - approval_required：先将人工审批绑定到契约，再执行本地委派。
 
@@ -39,6 +39,8 @@ start --worktree、worktree-create 和 prepare 前提交完整契约及预期修
 Executor 只能修改可写范围，运行必要检查并写回执，不得自我批准或合并。
 
 原生代理由 Root 通过真实派发启动，必须指定 Worktree、契约、文件归属和回执路径。
+Luna worker 不得作为 delegated 的中转或默认实现者；agy 不可用时，Root 必须先记录
+原因并批准切换为 direct，才能派发原生实现。
 Root 显式检查范围与证据后迁入 REVIEW，不对原生任务运行 agy 的 collect。
 合计并发和版本交接见 [混合执行](HYBRID_ORCHESTRATION.md)。
 
@@ -59,7 +61,8 @@ Codex 独立阅读契约、精确 Diff、Executor Receipt、测试证据、架�
 
 Review 不应悄悄修改实现。REWORK 必须记录具体问题并保留之前的尝试证据。
 
-只读 Reviewer 返回结果，由 Root 写 QA/Review。测试和审查必须针对同一快照，
+agy 完全退出后才启动 Luna tester/reviewer。只读 Reviewer 返回结果，由 Sol Root
+写 QA/Review 并作最终决定。测试和审查必须针对同一快照，
 包括未提交修改与新增文件；修复后必须重新验证受影响的证据。
 
 DONE 校验 COMPLETE 执行回执、REVIEWED QA、独立真实身份、任务/版本/尝试绑定、

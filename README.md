@@ -2,8 +2,9 @@
 
 [中文说明](README.zh-CN.md)
 
-A local-first AI development control plane: **Codex plans and reviews;
-Antigravity / Gemini implements bounded tasks in Git worktrees; humans approve
+A local-first AI development control plane: **Sol high decides and plans;
+Luna high explores and verifies; Antigravity / Gemini implements bounded tasks
+in Git worktrees; Sol makes the final acceptance decision; humans approve
 high-risk work and merge**.
 
 There is one task protocol and one primary CLI. Per-task `execution.mode` selects
@@ -51,11 +52,14 @@ new usage should use control.py.
 
 ## Use it inside Codex
 
-The project Plus profile uses Luna max for the root, Luna medium for native
-execution roles and Astra low for independent review. Root chooses native workers
-or local Antigravity under the same contract and risk gates. Native threads are
-capped at two; the combined native/agy budget is root-coordinated, not a shared
-runtime lock. See [Hybrid Orchestration](.agents/skills/antigravity-delegate/references/orchestration.md).
+The project Plus profile uses Sol high as the sole planning, architecture, and
+final-acceptance authority; Luna high for bounded read-only exploration,
+independent testing, and review; and local Antigravity as the default implementation
+backend for delegated and approval-required tasks. A native Luna worker is an
+explicit fallback only after the root records why agy is unavailable or unsuitable
+and approves a route change to direct. Native threads are capped at two; the
+combined native/agy budget is root-coordinated, not a shared runtime lock. See
+[Hybrid Orchestration](.agents/skills/antigravity-delegate/references/orchestration.md).
 
 With Python 3.11+, run `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` to detect
 project configuration drift. This is not runtime model or sandbox verification.
@@ -81,6 +85,11 @@ To request the local Antigravity backend explicitly:
 Use $antigravity-delegate, delegate the implementation to Antigravity,
 work in an isolated Git worktree, and return the test results and receipt path.
 ```
+
+The default handoff is sequential: a Luna explorer returns repository evidence;
+Sol creates the task contract; agy implements as the only writer; after agy exits,
+Luna tester/reviewer agents verify the same snapshot; Sol then reviews the diff,
+tests, and receipts and decides PASS, REWORK, or BLOCKED. No agent merges automatically.
 
 For a standalone Git project, initialize the minimal runtime state and probe the
 local executable first:
@@ -125,7 +134,8 @@ independent writers, one bounded retry with serial fallback, and a compact
 
 ```mermaid
 flowchart TD
-    H[Human intent] --> C[Codex\nPlan / Architecture]
+    H[Human intent] --> L[Luna high\nRead-only exploration]
+    L --> C[Sol high\nPlan / Architecture]
     C --> T[Core Protocol\ntask.yaml + Risk Gates]
     T --> R{execution.mode}
     R -->|direct| D[Direct implementation]
@@ -134,9 +144,10 @@ flowchart TD
     X --> A
     D --> E[Receipt + Evidence]
     A --> E
-    E --> V[Codex Independent Review]
-    V -->|REWORK| T
-    V -->|PASS| M[Human Merge]
+    E --> V[Luna high\nIndependent verification]
+    V --> S[Sol\nFinal decision]
+    S -->|REWORK| T
+    S -->|PASS| M[Human Merge]
 ```
 
 ## Execution modes
@@ -190,7 +201,7 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 ## Status
 
-Current version: **3.2.0-local**. The project is a local control workflow; no
+Current version: **3.3.0-local**. The project is a local control workflow; no
 remote scheduler, reviewer API, or fixed token-savings claim is required.
 
 ## License

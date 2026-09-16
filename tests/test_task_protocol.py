@@ -237,6 +237,102 @@ class TaskProtocolTests(unittest.TestCase):
             write_yaml(self.folder / "task.yaml", task)
             self.assertFalse(ai.validate_task(self.root, "TASK-TEST", quiet=True))
 
+    def test_optional_not_run_and_invalid_unverified_at_done_gate(self):
+        self.ready_review()
+        self.fill_evidence()
+
+        # Add optional check to task contract
+        task = read_yaml(self.folder / "task.yaml")
+        task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "optional style"}]
+        write_yaml(self.folder / "task.yaml", task)
+
+        negative_cases = [
+            # Required check in unverified_items
+            [{"command": "verify", "result": "NOT_RUN", "reason": "cannot skip required"}],
+            # Unknown check in unverified_items
+            [{"command": "unknown-check", "result": "NOT_RUN", "reason": "not in contract"}],
+            # Empty reason
+            [{"command": "flake8 .", "result": "NOT_RUN", "reason": "   "}],
+            # Unstructured item
+            ["flake8 ."],
+        ]
+        for bad_unverified in negative_cases:
+            with self.subTest(bad_unverified=bad_unverified):
+                executor = read_yaml(self.folder / "receipt.executor.yaml")
+                executor["unverified_items"] = bad_unverified
+                write_yaml(self.folder / "receipt.executor.yaml", executor)
+                with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+                    self.transition("DONE")
+                self.assertEqual(ai.find_task(self.root, "TASK-TEST")[0], "REVIEW")
+
+        # Positive: structured optional NOT_RUN with nonempty reason allows transition to DONE
+        executor = read_yaml(self.folder / "receipt.executor.yaml")
+        executor["unverified_items"] = [{"command": "flake8 .", "result": "NOT_RUN", "reason": "offline env"}]
+        write_yaml(self.folder / "receipt.executor.yaml", executor)
+
+        self.transition("DONE")
+        self.assertEqual(ai.find_task(self.root, "TASK-TEST")[0], "DONE")
+
+    def test_known_issues_disposition_and_residual_risk_at_done_gate(self):
+        self.ready_review()
+        self.fill_evidence()
+
+        executor = read_yaml(self.folder / "receipt.executor.yaml")
+        executor["known_issues"] = ["non-blocking latency spike in test helper"]
+        write_yaml(self.folder / "receipt.executor.yaml", executor)
+
+        # 1. Reported issues never auto-DONE with bare PASS verdict
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+        self.assertEqual(ai.find_task(self.root, "TASK-TEST")[0], "REVIEW")
+
+        # 2. Both verdicts set to PASS_WITH_NOTES, but QA disposition is missing -> rejects
+        qa = read_yaml(self.folder / "receipt.qa.yaml")
+        qa["verdict"] = "PASS_WITH_NOTES"
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        review = read_yaml(self.folder / "review.yaml")
+        review["verdict"] = "PASS_WITH_NOTES"
+        write_yaml(self.folder / "review.yaml", review)
+
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 3. QA disposition is BLOCKING -> rejects
+        qa["known_issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "BLOCKING",
+             "evidence_checked": "verified latency logs", "risk_owner_approval": "gpt-5.6-sol"}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 4. QA disposition missing evidence_checked -> rejects
+        qa["known_issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "", "risk_owner_approval": "gpt-5.6-sol"}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 5. QA disposition missing risk_owner_approval -> rejects
+        qa["known_issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "verified latency logs", "risk_owner_approval": ""}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 6. Accepted residual with one-to-one QA disposition, evidence checked, risk-owner approval, PASS_WITH_NOTES -> DONE succeeds
+        qa["known_issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "verified latency logs and bounded risk", "risk_owner_approval": "gpt-5.6-sol"}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        self.transition("DONE")
+        self.assertEqual(ai.find_task(self.root, "TASK-TEST")[0], "DONE")
+
 
 if __name__ == "__main__":
     unittest.main()

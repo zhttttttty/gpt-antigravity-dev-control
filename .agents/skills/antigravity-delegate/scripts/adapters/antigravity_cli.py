@@ -195,18 +195,43 @@ def diagnose(receipt, logs):
                 text += stream.read(262144).decode("utf-8", errors="replace").lower()
     if "soft-denying tool confirmation" in text:
         return "PERMISSION_BLOCKED"
-    if "you are not logged into antigravity" in text and "silent auth succeeded" not in text:
-        return "AUTH_REQUIRED"
+
+    login_warn_markers = ("you are not logged into antigravity",)
+    auth_success_markers = (
+        "silent auth succeeded",
+        "authorization succeeded",
+        "login succeeded",
+        "login successful",
+        "successfully logged in",
+        "authenticated successfully",
+    )
+    warn_pos = max((text.rfind(m) for m in login_warn_markers), default=-1)
+    auth_pos = max((text.rfind(m) for m in auth_success_markers), default=-1)
+    has_later_auth = auth_pos > warn_pos if warn_pos != -1 else False
+
+    receipt_valid = False
+    receipt_category = "NO_COMPLETION_EVIDENCE"
     try:
         if receipt.stat().st_size > 128000:
-            return "RECEIPT_INVALID"
-        value = yaml.safe_load(receipt.read_text(encoding="utf-8"))
+            receipt_category = "RECEIPT_INVALID"
+        else:
+            value = yaml.safe_load(receipt.read_text(encoding="utf-8"))
+            if not isinstance(value, dict):
+                receipt_category = "RECEIPT_INVALID"
+            elif value.get("status") in {"COMPLETE", "BLOCKED", "FAILED"}:
+                receipt_valid = True
+                receipt_category = "RECEIPT_PRESENT_UNVERIFIED"
+            else:
+                receipt_category = "NO_COMPLETION_EVIDENCE"
     except FileNotFoundError:
-        return "RECEIPT_MISSING"
+        receipt_category = "RECEIPT_MISSING"
     except (OSError, ValueError, yaml.YAMLError):
-        return "RECEIPT_INVALID"
-    if not isinstance(value, dict):
-        return "RECEIPT_INVALID"
-    if value.get("status") in {"COMPLETE", "BLOCKED", "FAILED"}:
-        return "RECEIPT_PRESENT_UNVERIFIED"
-    return "NO_COMPLETION_EVIDENCE"
+        receipt_category = "RECEIPT_INVALID"
+
+    if warn_pos != -1 and not (has_later_auth and receipt_valid):
+        # If there is later auth but receipt is missing/invalid, diagnose will report the receipt issue.
+        # But if there is no later auth, it remains a current true auth failure.
+        if not has_later_auth:
+            return "AUTH_REQUIRED"
+
+    return receipt_category

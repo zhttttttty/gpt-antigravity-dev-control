@@ -16,7 +16,7 @@ import time
 
 import yaml
 import ai
-from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml
+from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml, validate_unverified_items
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "adapters"))
 from antigravity_cli import AntigravityCLI, diagnose
@@ -265,22 +265,67 @@ def collect(root, ident):
                                            "contract_revision": task["contract_revision"], "schema_version": 2}.items()):
         raise ValueError("Receipt identity/revision mismatch")
     if receipt.get("status") not in {"COMPLETE", "BLOCKED", "FAILED"}:
-        raise ValueError("Receipt is not complete; launcher exit is not evidence")
+        raise ValueError(f"Receipt is not complete; status must be COMPLETE, BLOCKED, or FAILED, got {receipt.get('status')!r}")
+
+    ws = receipt.get("workspace")
+    if ws is not None:
+        if not isinstance(ws, dict):
+            raise ValueError("Malformed workspace: expected mapping")
+        if ws.get("path") is not None:
+            claimed_p = os.path.normcase(os.path.abspath(str(ws["path"])))
+            actual_p = os.path.normcase(os.path.abspath(str(worktree)))
+            if claimed_p != actual_p:
+                raise ValueError(f"Workspace path mismatch: claimed {ws['path']!r} != actual {str(worktree)!r}")
+        if ws.get("branch") is not None and ws["branch"] != record["branch"]:
+            raise ValueError(f"Workspace branch mismatch: claimed {ws['branch']!r} != actual {record['branch']!r}")
+        if ws.get("base_commit") is not None and ws["base_commit"] != record["base_commit"]:
+            raise ValueError(f"Workspace base commit mismatch: claimed {ws['base_commit']!r} != actual {record['base_commit']!r}")
+        if ws.get("head_commit") is not None and ws["head_commit"] != head:
+            raise ValueError(f"Workspace head commit mismatch: claimed {ws['head_commit']!r} != actual {head!r}")
+
     passed, required_count, ac_passed, acceptance_count = evidence_counts(task, receipt)
     issues = []
     if violations:
         issues.append("Out-of-scope changes; inspect local full evidence")
     if passed != required_count or ac_passed != acceptance_count:
         issues.append("Required evidence missing or failed")
-    if receipt.get("known_issues") or receipt.get("unverified_items"):
-        issues.append("Executor reports issues or unverified items")
+    unverified_errors = validate_unverified_items(task, receipt.get("unverified_items") or [])
+    if unverified_errors:
+        issues.extend(unverified_errors)
     if (receipt.get("architecture_deviation") or {}).get("result") != "NONE":
         issues.append("Architecture deviation needs review")
     target = "REVIEW" if receipt["status"] == "COMPLETE" and not issues else "BLOCKED"
+
+    executor_known_issues = receipt.get("known_issues") or []
+    if not isinstance(executor_known_issues, list):
+        executor_known_issues = [executor_known_issues]
+
+    summary_known_issues = []
+    for item in executor_known_issues:
+        if isinstance(item, str):
+            summary_known_issues.append({"issue": item, "text": item, "marker": "REPORTED", "result": "REPORTED"})
+        elif isinstance(item, dict):
+            d = dict(item)
+            text = d.get("issue") or d.get("text") or d.get("description") or str(d)
+            marker = d.get("marker") or d.get("status") or d.get("result") or "REPORTED"
+            d["issue"] = text
+            d["text"] = text
+            d["marker"] = marker
+            d["result"] = marker
+            summary_known_issues.append(d)
+        else:
+            summary_known_issues.append({"issue": str(item), "text": str(item), "marker": "REPORTED", "result": "REPORTED"})
+
+    issue_marker = "REPORTED" if executor_known_issues else "NONE"
+    if issues:
+        issue_marker = "BLOCKING"
+
     summary = {"task_id": ident, "status": "COMPLETE" if target == "REVIEW" else "BLOCKED",
                "task_state": target, "base_commit": record["base_commit"], "head_commit": head,
                "changed_files": len(files), "changed_files_preview": files[:20],
-               "scope_check": "FAIL" if violations else "PASS", "known_issues": issues,
+               "scope_check": "FAIL" if violations else "PASS",
+               "known_issues": issues if issues else summary_known_issues,
+               "issue_marker": issue_marker,
                "checks": {"reported_passed": passed, "required": required_count},
                "acceptance": {"reported_passed": ac_passed, "total": acceptance_count},
                "evidence_trust": "executor_reported; independent review pending",

@@ -369,6 +369,177 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertEqual(cp.returncode, 2, cp.stderr)
         self.assertEqual(json.loads(cp.stdout)['phase'], 'NEEDS_ATTENTION')
 
+    def test_diagnose_recovered_auth_and_true_auth_failures(self):
+        log = self.root / "auth-test.log"
+        receipt = self.root / "receipt-auth-test.yaml"
+        receipt.write_text("status: COMPLETE\n")
+
+        # Recovered auth: earlier warning, later successful authorization + valid receipt -> RECEIPT_PRESENT_UNVERIFIED
+        log.write_text("You are not logged into Antigravity.\nPrint mode: silent auth succeeded\n")
+        self.assertEqual(diagnose(receipt, [log]), "RECEIPT_PRESENT_UNVERIFIED")
+
+        # Recovered auth with explicit authorization succeeded message
+        log.write_text("You are not logged into Antigravity.\nAuthorization succeeded\n")
+        self.assertEqual(diagnose(receipt, [log]), "RECEIPT_PRESENT_UNVERIFIED")
+
+        # Recovered auth but receipt missing -> RECEIPT_MISSING
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "RECEIPT_MISSING")
+
+        # True auth failure: warning without later successful auth -> AUTH_REQUIRED even if receipt valid
+        log.write_text("You are not logged into Antigravity.\n")
+        self.assertEqual(diagnose(receipt, [log]), "AUTH_REQUIRED")
+
+        # True auth failure: auth success happened earlier, but warning happened later -> AUTH_REQUIRED
+        log.write_text("Print mode: silent auth succeeded\nYou are not logged into Antigravity.\n")
+        self.assertEqual(diagnose(receipt, [log]), "AUTH_REQUIRED")
+
+    def test_collect_workspace_base_head_validation(self):
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+
+        # Wrong base commit in workspace
+        receipt["workspace"] = {"base_commit": "0" * 40}
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "base commit mismatch"):
+            self.collect()
+
+        # Wrong head commit in workspace
+        receipt["workspace"] = {"head_commit": "0" * 40}
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "head commit mismatch"):
+            self.collect()
+
+        # Wrong branch in workspace
+        receipt["workspace"] = {"branch": "wrong-branch"}
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "branch mismatch"):
+            self.collect()
+
+        # Wrong path in workspace
+        receipt["workspace"] = {"path": str(self.root / "wrong-path")}
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "path mismatch"):
+            self.collect()
+
+    def test_collect_rejects_malformed_completion_and_evidence(self):
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+
+        # Malformed completion status: SUCCESS
+        receipt["status"] = "SUCCESS"
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "status must be COMPLETE, BLOCKED, or FAILED"):
+            self.collect()
+
+        # Malformed completion status: COMPLETED
+        receipt["status"] = "COMPLETED"
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "status must be COMPLETE, BLOCKED, or FAILED"):
+            self.collect()
+
+        # Malformed command result: PASSED
+        receipt["status"] = "COMPLETE"
+        receipt["commands"] = [{"command": "python -m unittest", "exit_code": 0, "result": "PASSED"}]
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "Malformed command result"):
+            self.collect()
+
+        # Malformed command evidence: status instead of result
+        receipt["commands"] = [{"command": "python -m unittest", "exit_code": 0, "status": "PASS"}]
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "status field used instead of result"):
+            self.collect()
+
+        # Malformed acceptance evidence: id instead of acceptance_id
+        receipt["commands"] = [{"command": "python -m unittest", "exit_code": 0, "result": "PASS"}]
+        receipt["acceptance_evidence"] = [{"id": "AC-001", "result": "PASS", "evidence": "src/result.txt"}]
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "id field used instead of acceptance_id"):
+            self.collect()
+
+        # Malformed acceptance evidence: status instead of result
+        receipt["acceptance_evidence"] = [{"acceptance_id": "AC-001", "status": "PASS", "evidence": "src/result.txt"}]
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "status field used instead of result"):
+            self.collect()
+
+        # Malformed acceptance evidence: result PASSED instead of PASS
+        receipt["acceptance_evidence"] = [{"acceptance_id": "AC-001", "result": "PASSED", "evidence": "src/result.txt"}]
+        p.write_text(yaml.safe_dump(receipt))
+        with self.assertRaisesRegex(ValueError, "Malformed acceptance result"):
+            self.collect()
+
+    def test_collect_structured_optional_not_run_positive(self):
+        self.task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "linter"}]
+        self.write_task(); self.commit()
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        receipt["unverified_items"] = [{"command": "flake8 .", "result": "NOT_RUN", "reason": "offline env"}]
+        p.write_text(yaml.safe_dump(receipt))
+        result = self.collect()
+        self.assertEqual(result["task_state"], "REVIEW")
+
+    def test_collect_unverified_required_blocks(self):
+        self.task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "linter"}]
+        self.write_task(); self.commit()
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        receipt["unverified_items"] = [{"command": "python -m unittest", "result": "NOT_RUN", "reason": "skipped"}]
+        p.write_text(yaml.safe_dump(receipt))
+        result = self.collect()
+        self.assertEqual(result["task_state"], "BLOCKED")
+
+    def test_collect_unverified_unknown_blocks(self):
+        self.task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "linter"}]
+        self.write_task(); self.commit()
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        receipt["unverified_items"] = [{"command": "unknown-check", "result": "NOT_RUN", "reason": "skipped"}]
+        p.write_text(yaml.safe_dump(receipt))
+        result = self.collect()
+        self.assertEqual(result["task_state"], "BLOCKED")
+
+    def test_collect_unverified_unstructured_blocks(self):
+        self.task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "linter"}]
+        self.write_task(); self.commit()
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        receipt["unverified_items"] = ["flake8 ."]
+        p.write_text(yaml.safe_dump(receipt))
+        result = self.collect()
+        self.assertEqual(result["task_state"], "BLOCKED")
+
+    def test_collect_unverified_empty_reason_blocks(self):
+        self.task["checks"]["optional"] = [{"command": "flake8 .", "purpose": "linter"}]
+        self.write_task(); self.commit()
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        receipt["unverified_items"] = [{"command": "flake8 .", "result": "NOT_RUN", "reason": "   "}]
+        p.write_text(yaml.safe_dump(receipt))
+        result = self.collect()
+        self.assertEqual(result["task_state"], "BLOCKED")
+
+    def test_collect_known_issues_enter_review_with_marker(self):
+        record = self.prepare()
+        p = self.finish(record)
+        receipt = d.read_yaml(p)
+        issue_text = "performance warning on windows file lock"
+        receipt["known_issues"] = [issue_text]
+        p.write_text(yaml.safe_dump(receipt))
+
+        result = self.collect()
+        self.assertEqual(result["task_state"], "REVIEW")
+        self.assertNotEqual(result.get("issue_marker"), "PASS")
+        self.assertEqual(result.get("issue_marker"), "REPORTED")
+        self.assertIn(issue_text, str(result["known_issues"]))
+
 
 if __name__ == "__main__":
     unittest.main()

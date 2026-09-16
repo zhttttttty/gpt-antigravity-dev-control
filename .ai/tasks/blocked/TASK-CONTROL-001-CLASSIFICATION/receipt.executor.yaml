@@ -1,0 +1,69 @@
+schema_version: 2
+task_id: TASK-CONTROL-001-CLASSIFICATION
+contract_revision: 1
+attempt: 1
+executor: antigravity
+status: COMPLETE
+workspace:
+  path: D:\UserData\Desktop\APP\gpt-antigravity-control-ascii\.worktrees\TASK-CONTROL-001-CLASSIFICATION-1
+  branch: ai/local/TASK-CONTROL-001-CLASSIFICATION-1
+  base_commit: 33c9b01a7d3219c8662bb6089e2f719899db9bf4
+  head_commit: b9ac267785baf4264d0e6570dd346b5d22a571a0
+started_at: '2026-09-16T10:38:12+08:00'
+ended_at: '2026-09-16T10:52:26+08:00'
+changed_files:
+- .agents/skills/antigravity-delegate/references/receipt-protocol.md
+- .agents/skills/antigravity-delegate/references/workflow.md
+- .agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py
+- .agents/skills/antigravity-delegate/scripts/delegate.py
+- .agents/skills/antigravity-delegate/scripts/task_data.py
+- .agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml
+- .agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml
+- tests/test_local_delegation.py
+- tests/test_task_protocol.py
+commands:
+- command: python -m unittest discover -s tests -v
+  exit_code: 0
+  result: PASS
+  log: .ai/runtime/delegation/check-unittest.log
+- command: python -m compileall -q .agents/skills/antigravity-delegate/scripts tests
+  exit_code: 0
+  result: PASS
+  log: .ai/runtime/delegation/check-compileall.log
+- command: git diff --check ai/control-governance-20260916...HEAD
+  exit_code: 0
+  result: PASS
+  log: .ai/runtime/delegation/check-git-diff.log
+acceptance_evidence:
+- acceptance_id: AC-C001
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests.test_diagnose_recovered_auth_and_true_auth_failures
+- acceptance_id: AC-C002
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests.test_collect_workspace_base_head_validation,
+    tests/test_local_delegation.py::LocalDelegationTests.test_collect_rejects_malformed_completion_and_evidence
+- acceptance_id: AC-C003
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests.test_collect_structured_optional_not_run_positive,
+    tests/test_local_delegation.py::LocalDelegationTests.test_collect_unverified_required_blocks,
+    tests/test_task_protocol.py::TaskProtocolTests.test_optional_not_run_and_invalid_unverified_at_done_gate
+- acceptance_id: AC-C004
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests.test_collect_known_issues_enter_review_with_marker,
+    tests/test_task_protocol.py::TaskProtocolTests.test_known_issues_disposition_and_residual_risk_at_done_gate
+scope_check:
+  result: FAIL
+  out_of_scope_files:
+  - .agents/skills/antigravity-delegate/references/receipt-protocol.md
+  - .agents/skills/antigravity-delegate/references/workflow.md
+  - .agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py
+  - .agents/skills/antigravity-delegate/scripts/delegate.py
+  - .agents/skills/antigravity-delegate/scripts/task_data.py
+  - .agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml
+  - .agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml
+architecture_deviation:
+  result: NONE
+  details: null
+known_issues: []
+unverified_items: []
+notes: Bounded receipt risk classification repair completed per contract AC-C001..AC-C004.

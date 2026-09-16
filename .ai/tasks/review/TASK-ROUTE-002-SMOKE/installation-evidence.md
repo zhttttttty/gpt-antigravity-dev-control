@@ -10,4 +10,4 @@
 - Original e553 executor snapshot and receipt untouched; original task retains REWORK. All failed worktrees/logs preserved. No main merge, push, automatic DONE or business integration.
 - Actual account/model capacity not inferred from successful smoke; token counts unavailable.
 
-Overall final Sol route decision pending this installation evidence review.
+Overall final Sol route decision: PASS with non-blocking notes. Sol independently checked installed hashes5/5 against manifest and accepted bootstrap, real smoke, and installation evidence. This closes route repair only, not Token Hunter implementation; no automatic DONE/main merge/business integration.

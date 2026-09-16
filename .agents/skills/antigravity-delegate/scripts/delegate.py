@@ -16,7 +16,7 @@ import time
 
 import yaml
 import ai
-from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml
+from task_data import read_yaml, digest, task_id, require_approval, evidence_counts, write_yaml, validate_unverified_items
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "adapters"))
 from antigravity_cli import AntigravityCLI, diagnose
@@ -230,11 +230,91 @@ def launch(root, ident, adapter: Executor, approved=False, recover=False):
     return record
 
 
-def scope_violations(files, task):
+ALLOWED_SELF_REPAIR_TASKS = {
+    ("TASK-ROUTE-001-END-TO-END", 2),
+}
+
+ALLOWED_SELF_REPAIR_PATHS = {
+    ".agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py",
+    ".agents/skills/antigravity-delegate/scripts/delegate.py",
+    ".agents/skills/antigravity-delegate/scripts/task_data.py",
+    ".agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml",
+    ".agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml",
+    ".agents/skills/antigravity-delegate/references/receipt-protocol.md",
+    ".agents/skills/antigravity-delegate/references/workflow.md",
+}
+
+
+CONTROLLER_COMMIT_ANCHOR = "e55f40f82168dcf2c0aeb2b927a5783473f78d0e"
+
+
+def is_controller_repo(root):
+    """Identify this controller's Git repository, never a directory-name lookalike."""
+    if root is None:
+        return False
+    try:
+        target = Path(root).resolve(strict=True)
+        if not target.is_dir():
+            return False
+        top = Path(git(target, "rev-parse", "--show-toplevel")).resolve(strict=True)
+        if target != top:
+            return False
+        source = Path(__file__).resolve(strict=True).parent
+        source_common = Path(git(source, "rev-parse", "--path-format=absolute",
+                                 "--git-common-dir")).resolve(strict=True)
+        target_common = Path(git(target, "rev-parse", "--path-format=absolute",
+                                 "--git-common-dir")).resolve(strict=True)
+        if source_common != target_common:
+            return False
+        git(target, "merge-base", "--is-ancestor", CONTROLLER_COMMIT_ANCHOR, "HEAD")
+        return True
+    except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError):
+        return False
+
+
+def is_valid_pre_review(task, pre_review):
+    if not isinstance(pre_review, dict):
+        return False
+    return (
+        pre_review.get("task_id") == task.get("id")
+        and pre_review.get("contract_sha256") == digest(task)
+        and pre_review.get("result") == "APPROVED"
+        and bool(pre_review.get("approved_by"))
+        and bool(pre_review.get("evidence"))
+    )
+
+
+def scope_violations(files, task, root=None, pre_review=None):
     writable = task["scope"].get("writable", [])
-    protected = task["scope"].get("protected", []) + [".ai/**", ".agents/**", "AGENTS.md", "GEMINI.md"]
-    return [p for p in files if any(fnmatch.fnmatchcase(p, pat) for pat in protected)
-            or not any(fnmatch.fnmatchcase(p, pat) for pat in writable)]
+    explicit_protected = task["scope"].get("protected", [])
+    fixed_protected = [".ai/**", "AGENTS.md", "GEMINI.md"]
+
+    task_tuple = (task.get("id"), task.get("contract_revision"))
+    self_repair_ok = (
+        task_tuple in ALLOWED_SELF_REPAIR_TASKS
+        and is_controller_repo(root)
+        and is_valid_pre_review(task, pre_review)
+    )
+
+    violations = []
+    for p_raw in files:
+        p = p_raw.replace("\\", "/")
+        if any(fnmatch.fnmatchcase(p, pat) for pat in explicit_protected):
+            violations.append(p_raw)
+            continue
+        if any(fnmatch.fnmatchcase(p, pat) for pat in fixed_protected):
+            violations.append(p_raw)
+            continue
+        if fnmatch.fnmatchcase(p, ".agents/**"):
+            if self_repair_ok and p in ALLOWED_SELF_REPAIR_PATHS:
+                pass
+            else:
+                violations.append(p_raw)
+                continue
+        if not any(fnmatch.fnmatchcase(p, pat) for pat in writable):
+            violations.append(p_raw)
+            continue
+    return violations
 
 
 def collect(root, ident):
@@ -258,29 +338,76 @@ def collect(root, ident):
     names = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", record["base_commit"], head],
                            cwd=worktree, check=True, capture_output=True).stdout.decode("utf-8")
     files = sorted(filter(None, names.split("\0")))
-    violations = scope_violations(files, task)
+    violations = scope_violations(files, task, root=root, pre_review=record.get("pre_review"))
     receipt_path = worktree / ".ai/runtime/delegation/receipt.executor.yaml"
     receipt = read_yaml(receipt_path)
     if any(receipt.get(k) != v for k, v in {"task_id": ident, "attempt": task["attempt"],
                                            "contract_revision": task["contract_revision"], "schema_version": 2}.items()):
         raise ValueError("Receipt identity/revision mismatch")
     if receipt.get("status") not in {"COMPLETE", "BLOCKED", "FAILED"}:
-        raise ValueError("Receipt is not complete; launcher exit is not evidence")
+        raise ValueError(f"Receipt is not complete; status must be COMPLETE, BLOCKED, or FAILED, got {receipt.get('status')!r}")
+
+    ws = receipt.get("workspace")
+    if not isinstance(ws, dict):
+        raise ValueError("Malformed workspace: expected mapping")
+    for field in ("path", "branch", "base_commit", "head_commit"):
+        val = ws.get(field)
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"Malformed workspace: {field} must be a nonempty string")
+    claimed_p = os.path.normcase(os.path.abspath(str(ws["path"])))
+    actual_p = os.path.normcase(os.path.abspath(str(worktree)))
+    if claimed_p != actual_p:
+        raise ValueError(f"Workspace path mismatch: claimed {ws['path']!r} != actual {str(worktree)!r}")
+    if ws["branch"] != record["branch"]:
+        raise ValueError(f"Workspace branch mismatch: claimed {ws['branch']!r} != actual {record['branch']!r}")
+    if ws["base_commit"] != record["base_commit"]:
+        raise ValueError(f"Workspace base commit mismatch: claimed {ws['base_commit']!r} != actual {record['base_commit']!r}")
+    if ws["head_commit"] != head:
+        raise ValueError(f"Workspace head commit mismatch: claimed {ws['head_commit']!r} != actual {head!r}")
+
     passed, required_count, ac_passed, acceptance_count = evidence_counts(task, receipt)
     issues = []
     if violations:
         issues.append("Out-of-scope changes; inspect local full evidence")
     if passed != required_count or ac_passed != acceptance_count:
         issues.append("Required evidence missing or failed")
-    if receipt.get("known_issues") or receipt.get("unverified_items"):
-        issues.append("Executor reports issues or unverified items")
+    unverified_errors = validate_unverified_items(task, receipt.get("unverified_items") or [])
+    if unverified_errors:
+        issues.extend(unverified_errors)
     if (receipt.get("architecture_deviation") or {}).get("result") != "NONE":
         issues.append("Architecture deviation needs review")
     target = "REVIEW" if receipt["status"] == "COMPLETE" and not issues else "BLOCKED"
+
+    executor_known_issues = receipt.get("known_issues") or []
+    if not isinstance(executor_known_issues, list):
+        executor_known_issues = [executor_known_issues]
+
+    summary_known_issues = []
+    for item in executor_known_issues:
+        if isinstance(item, str):
+            summary_known_issues.append({"issue": item, "text": item, "marker": "REPORTED", "result": "REPORTED"})
+        elif isinstance(item, dict):
+            d = dict(item)
+            text = d.get("issue") or d.get("text") or d.get("description") or str(d)
+            marker = d.get("marker") or d.get("status") or d.get("result") or "REPORTED"
+            d["issue"] = text
+            d["text"] = text
+            d["marker"] = marker
+            d["result"] = marker
+            summary_known_issues.append(d)
+        else:
+            summary_known_issues.append({"issue": str(item), "text": str(item), "marker": "REPORTED", "result": "REPORTED"})
+
+    issue_marker = "REPORTED" if executor_known_issues else "NONE"
+    if issues:
+        issue_marker = "BLOCKING"
+
     summary = {"task_id": ident, "status": "COMPLETE" if target == "REVIEW" else "BLOCKED",
                "task_state": target, "base_commit": record["base_commit"], "head_commit": head,
                "changed_files": len(files), "changed_files_preview": files[:20],
-               "scope_check": "FAIL" if violations else "PASS", "known_issues": issues,
+               "scope_check": "FAIL" if violations else "PASS",
+               "known_issues": issues if issues else summary_known_issues,
+               "issue_marker": issue_marker,
                "checks": {"reported_passed": passed, "required": required_count},
                "acceptance": {"reported_passed": ac_passed, "total": acceptance_count},
                "evidence_trust": "executor_reported; independent review pending",

@@ -1,4 +1,5 @@
 """Explicit argv adapter. Never infer headless capability from --help success."""
+import json
 import shutil
 import subprocess
 import sys
@@ -39,7 +40,7 @@ class AntigravityCLI:
     def argv(self, worktree, context, receipt, logs):
         prompt = (
             "Work ONLY inside {worktree}. Read the absolute task context file {context}. "
-            "Use absolute paths for file/search tools and this worktree as command cwd. "
+            "Use absolute paths for native file creation/edit tools, but for searches use relative paths in worktree cwd (never absolute Windows drive paths in grep_search). "
             "Do not access home, scratch or parent directories. "
         )
         if self.mode == "plan":
@@ -50,8 +51,13 @@ class AntigravityCLI:
         else:
             prompt += (
                 "Implement only the contract. Use native file creation/edit tools (nonempty content), "
-                "not multiline shell or encoded Python commands to write files. Run the required test "
-                "commands and save actual test output locally. Commit implementation files only. "
+                "not multiline shell or encoded Python commands to write files. "
+                "Prefer synchronous bounded commands and relative-path search in worktree cwd on Windows. "
+                "Print-mode command workflow uses actual returned handle; if run_command returns a TaskId, "
+                "immediately poll manage_task status for that exact TaskId until DONE/FAILED; "
+                "if CommandId use command_status. Do not use schedule, timers, or passively narrate waiting. "
+                "Read returned actual stdout/stderr; do not claim missing exit codes. "
+                "Run the required test commands and save actual test output locally. Commit implementation files only. "
                 "Fill the executor receipt at {receipt} using native file editing, then STOP. "
                 "Do not read/write QA or review files, expand scope, merge, push, or claim unexecuted tests passed. "
             )
@@ -62,6 +68,7 @@ class AntigravityCLI:
             capabilities = self.capabilities()
             mode_args = ["--mode", self.mode] if capabilities["mode"] else []
             access_args = ["--dangerously-skip-permissions"] if self.full_access else []
+            format_args = ["--output-format", "stream-json"] if (not self.interactive and capabilities.get("stream_json")) else []
             if self.interactive:
                 args = [
                     "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
@@ -70,6 +77,7 @@ class AntigravityCLI:
             else:
                 args = [
                     "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
+                    *format_args,
                     *mode_args, *access_args, "--print-timeout", "20m",
                     f"{capabilities['print_arg']}={prompt}",
                 ]
@@ -113,6 +121,7 @@ class AntigravityCLI:
             "sandbox": "--sandbox" in help_text,
             "mode": "--mode" in help_text,
             "mode_values": mode_values,
+            "stream_json": "--output-format" in help_text and "stream-json" in help_text,
             "print_arg": "--print" if "--print" in help_text else "-p" if "-p" in help_text else None,
             "interactive_arg": "--prompt-interactive" if "--prompt-interactive" in help_text else "-i" if "-i" in help_text else None,
         }
@@ -180,9 +189,264 @@ class AntigravityCLI:
             except KeyboardInterrupt:
                 result.update(error="Interactive session interrupted; inspect worktree before recovery",
                               diagnostic="INTERRUPTED")
+        if not self.interactive and path.is_file():
+            try:
+                events = parse_stream_events(path.read_text(encoding="utf-8", errors="replace"))
+                if events:
+                    events_path = logs / "events.json"
+                    events_path.write_text(json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8")
+                    result["stream_events"] = str(events_path)
+                else:
+                    result["stream_events"] = "EMPTY_OR_UNSUPPORTED"
+            except Exception:
+                result["stream_events"] = "PARSE_ERROR"
+        else:
+            result["stream_events"] = "NOT_APPLICABLE" if self.interactive else "LOG_MISSING"
         if "diagnostic" not in result:
             result["diagnostic"] = diagnose(receipt, [path, logs / "agy.log"])
         return result
+
+
+def parse_stream_events(log_content):
+    """Parse NDJSON stream-json output; capture tool start/completion, handle, result, timestamps.
+    Do not claim exit code when unavailable (unknown is UNKNOWN).
+    Handle malformed or truncated lines defensively.
+    """
+    events = []
+    lines = log_content.splitlines() if isinstance(log_content, str) else log_content
+    for line in lines:
+        line_str = line.decode("utf-8", errors="replace") if isinstance(line, (bytes, bytearray)) else str(line)
+        line_str = line_str.strip()
+        if not line_str or not line_str.startswith("{"):
+            continue
+        try:
+            payload = json.loads(line_str)
+        except (json.JSONDecodeError, ValueError):
+            events.append({"event": "malformed", "raw": line_str[:200], "status": "MALFORMED"})
+            continue
+
+        if not isinstance(payload, dict):
+            continue
+
+        event_name = payload.get("event")
+        if event_name == "step_update":
+            step = payload.get("step_update")
+            if not isinstance(step, dict):
+                events.append({"event": "malformed", "raw": line_str[:200], "status": "MALFORMED"})
+                continue
+            step_type = step.get("step_type")
+            if step_type == "tool":
+                state = step.get("state")
+                tool_info = step.get("tool_info")
+                if tool_info is not None and not isinstance(tool_info, dict):
+                    events.append({"event": "malformed", "raw": line_str[:200], "status": "MALFORMED"})
+                    continue
+                if not isinstance(tool_info, dict):
+                    tool_info = {}
+                tool_name = step.get("tool_name") or tool_info.get("name")
+                params = tool_info.get("parameters") or {}
+                if not isinstance(params, dict):
+                    params = {}
+
+                handle = None
+                raw_handle = params.get("TaskId") or params.get("task_id") or params.get("CommandId") or params.get("command_id")
+                if isinstance(raw_handle, str) and raw_handle.strip():
+                    handle = raw_handle.strip()
+
+                output_data = None
+                error_data = None
+                if isinstance(tool_info, dict):
+                    output_data = tool_info.get("output")
+                    if output_data is None:
+                        output_data = tool_info.get("result")
+                    error_data = tool_info.get("error")
+                if output_data is None and isinstance(step, dict):
+                    output_data = step.get("result")
+
+                result_data = error_data if state == "ERROR" else output_data
+
+                if not handle and isinstance(output_data, dict):
+                    raw_h = output_data.get("TaskId") or output_data.get("task_id") or output_data.get("CommandId") or output_data.get("command_id")
+                    if isinstance(raw_h, str) and raw_h.strip():
+                        handle = raw_h.strip()
+                elif not handle and isinstance(output_data, str):
+                    match = re.search(r"(?:task id[:=\s\"']+|TaskId[:=\s\"']+)([a-zA-Z0-9_/.-]+)", output_data, re.IGNORECASE)
+                    if match:
+                        handle = match.group(1)
+                    else:
+                        match_cmd = re.search(r"(?:command id[:=\s\"']+|CommandId[:=\s\"']+)([a-zA-Z0-9_/.-]+)", output_data, re.IGNORECASE)
+                        if match_cmd:
+                            handle = match_cmd.group(1)
+
+                timestamp = (
+                    step.get("timestamp")
+                    or step.get("created_at")
+                    or payload.get("timestamp")
+                    or (tool_info.get("timestamp") if isinstance(tool_info, dict) else None)
+                    or "UNKNOWN"
+                )
+
+                event_record = {
+                    "event": "tool_start" if state == "ACTIVE" else "tool_completion",
+                    "tool_name": tool_name,
+                    "state": state,
+                    "handle": handle,
+                    "output": output_data,
+                    "result": result_data,
+                    "step_index": step.get("step_index"),
+                    "timestamp": timestamp,
+                    "duration_seconds": step.get("duration_seconds"),
+                    "exit_code": None,
+                }
+                events.append(event_record)
+        elif event_name == "result":
+            res = payload.get("result")
+            if res is not None and not isinstance(res, dict):
+                events.append({"event": "malformed", "raw": line_str[:200], "status": "MALFORMED"})
+                continue
+            if not isinstance(res, dict):
+                res = {}
+            res_timestamp = res.get("timestamp") or res.get("created_at") or payload.get("timestamp") or "UNKNOWN"
+            events.append({
+                "event": "session_result",
+                "status": res.get("status"),
+                "timestamp": res_timestamp,
+                "duration_seconds": res.get("duration_seconds"),
+            })
+    return events
+
+
+def diagnose_tool_handle(handle_or_output):
+    """Diagnose command handle or output: TaskId polled via manage_task status,
+    CommandId via command_status. Passive waiting/schedule/timers and unknown formats
+    are preserved as blockers.
+    """
+    if isinstance(handle_or_output, dict):
+        if "TaskId" in handle_or_output or "task_id" in handle_or_output:
+            tid = handle_or_output.get("TaskId") if "TaskId" in handle_or_output else handle_or_output.get("task_id")
+            if isinstance(tid, str) and tid.strip():
+                return {
+                    "status": "VALID",
+                    "handle_type": "task_id",
+                    "handle": tid.strip(),
+                    "poll_tool": "manage_task",
+                    "poll_action": "status",
+                }
+            return {
+                "status": "BLOCKED",
+                "handle_type": "task_id",
+                "error": f"Invalid TaskId: {tid!r}; must be nonempty string",
+            }
+        if "CommandId" in handle_or_output or "command_id" in handle_or_output:
+            cid = handle_or_output.get("CommandId") if "CommandId" in handle_or_output else handle_or_output.get("command_id")
+            if isinstance(cid, str) and cid.strip():
+                return {
+                    "status": "VALID",
+                    "handle_type": "command_id",
+                    "handle": cid.strip(),
+                    "poll_tool": "command_status",
+                }
+            return {
+                "status": "BLOCKED",
+                "handle_type": "command_id",
+                "error": f"Invalid CommandId: {cid!r}; must be nonempty string",
+            }
+        if handle_or_output.get("exit_code") is not None:
+            code = handle_or_output["exit_code"]
+            if type(code) is int:
+                return {
+                    "status": "COMPLETED",
+                    "handle_type": "synchronous",
+                    "exit_code": code,
+                }
+            return {
+                "status": "BLOCKED",
+                "handle_type": "synchronous",
+                "error": f"Invalid exit_code: {code!r}; must be integer",
+            }
+        return {
+            "status": "BLOCKED",
+            "handle_type": "unknown",
+            "error": f"Unknown structured handle format: {handle_or_output}",
+        }
+
+    if not isinstance(handle_or_output, str):
+        if handle_or_output is None:
+            return {"status": "BLOCKED", "handle_type": "empty", "error": "Empty command handle/output"}
+        return {
+            "status": "BLOCKED",
+            "handle_type": "malformed",
+            "error": f"Malformed handle/output type: {type(handle_or_output).__name__}",
+        }
+
+    text = handle_or_output.strip()
+    if not text:
+        return {"status": "BLOCKED", "handle_type": "empty", "error": "Empty command handle/output"}
+
+    passive_markers = [
+        "schedule",
+        "timer",
+        "passively narrat",
+        "waiting for background",
+        "wait for background",
+        "still running, waiting",
+        "sleep ",
+    ]
+    lower_text = text.lower()
+    for marker in passive_markers:
+        if marker in lower_text:
+            return {
+                "status": "BLOCKED",
+                "handle_type": "passive_waiting",
+                "error": f"Passive narration or wait timer/schedule detected ({marker}); must poll actual tool handle",
+            }
+
+    task_match = re.search(r"(?:task id[:=\s\"']+|TaskId[:=\s\"']+)([a-zA-Z0-9_/.-]+)", text, re.IGNORECASE)
+    if task_match:
+        val = task_match.group(1).strip()
+        if val and val.lower() not in {"null", "none", "empty"}:
+            return {
+                "status": "VALID",
+                "handle_type": "task_id",
+                "handle": val,
+                "poll_tool": "manage_task",
+                "poll_action": "status",
+            }
+        return {
+            "status": "BLOCKED",
+            "handle_type": "task_id",
+            "error": f"Null/empty TaskId in text: {val!r}",
+        }
+
+    cmd_match = re.search(r"(?:command id[:=\s\"']+|CommandId[:=\s\"']+)([a-zA-Z0-9_/.-]+)", text, re.IGNORECASE)
+    if cmd_match:
+        val = cmd_match.group(1).strip()
+        if val and val.lower() not in {"null", "none", "empty"}:
+            return {
+                "status": "VALID",
+                "handle_type": "command_id",
+                "handle": val,
+                "poll_tool": "command_status",
+            }
+        return {
+            "status": "BLOCKED",
+            "handle_type": "command_id",
+            "error": f"Null/empty CommandId in text: {val!r}",
+        }
+
+    exit_match = re.search(r"(?:exited with code\s+|returncode\s*[:=]\s*)(\d+)", text, re.IGNORECASE)
+    if exit_match:
+        return {
+            "status": "COMPLETED",
+            "handle_type": "synchronous",
+            "exit_code": int(exit_match.group(1)),
+        }
+
+    return {
+        "status": "BLOCKED",
+        "handle_type": "unknown",
+        "error": f"Unknown command handle format: {text[:100]}",
+    }
 
 
 def diagnose(receipt, logs):
@@ -195,18 +459,43 @@ def diagnose(receipt, logs):
                 text += stream.read(262144).decode("utf-8", errors="replace").lower()
     if "soft-denying tool confirmation" in text:
         return "PERMISSION_BLOCKED"
-    if "you are not logged into antigravity" in text and "silent auth succeeded" not in text:
-        return "AUTH_REQUIRED"
+
+    login_warn_markers = ("you are not logged into antigravity",)
+    auth_success_markers = (
+        "silent auth succeeded",
+        "authorization succeeded",
+        "login succeeded",
+        "login successful",
+        "successfully logged in",
+        "authenticated successfully",
+    )
+    warn_pos = max((text.rfind(m) for m in login_warn_markers), default=-1)
+    auth_pos = max((text.rfind(m) for m in auth_success_markers), default=-1)
+    has_later_auth = auth_pos > warn_pos if warn_pos != -1 else False
+
+    receipt_valid = False
+    receipt_category = "NO_COMPLETION_EVIDENCE"
     try:
         if receipt.stat().st_size > 128000:
-            return "RECEIPT_INVALID"
-        value = yaml.safe_load(receipt.read_text(encoding="utf-8"))
+            receipt_category = "RECEIPT_INVALID"
+        else:
+            value = yaml.safe_load(receipt.read_text(encoding="utf-8"))
+            if not isinstance(value, dict):
+                receipt_category = "RECEIPT_INVALID"
+            elif value.get("status") in {"COMPLETE", "BLOCKED", "FAILED"}:
+                receipt_valid = True
+                receipt_category = "RECEIPT_PRESENT_UNVERIFIED"
+            else:
+                receipt_category = "NO_COMPLETION_EVIDENCE"
     except FileNotFoundError:
-        return "RECEIPT_MISSING"
+        receipt_category = "RECEIPT_MISSING"
     except (OSError, ValueError, yaml.YAMLError):
-        return "RECEIPT_INVALID"
-    if not isinstance(value, dict):
-        return "RECEIPT_INVALID"
-    if value.get("status") in {"COMPLETE", "BLOCKED", "FAILED"}:
-        return "RECEIPT_PRESENT_UNVERIFIED"
-    return "NO_COMPLETION_EVIDENCE"
+        receipt_category = "RECEIPT_INVALID"
+
+    if warn_pos != -1 and not (has_later_auth and receipt_valid):
+        # If there is later auth but receipt is missing/invalid, diagnose will report the receipt issue.
+        # But if there is no later auth, it remains a current true auth failure.
+        if not has_later_auth:
+            return "AUTH_REQUIRED"
+
+    return receipt_category

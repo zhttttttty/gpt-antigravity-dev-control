@@ -38,5 +38,16 @@ architecture_deviation:
   details: null
 
 known_issues: []
+# Example:
+# - issue: minor warning in test helper
+#   marker: REPORTED
+# Or:
+# - minor warning in test helper
+
 unverified_items: []
+# Example:
+# - command: flake8 .
+#   result: NOT_RUN
+#   reason: optional linter skipped in offline environment
+
 notes: null

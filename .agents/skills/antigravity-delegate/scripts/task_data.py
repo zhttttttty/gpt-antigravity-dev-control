@@ -85,6 +85,32 @@ def evidence_counts(task, receipt):
         raise ValueError("Invalid commands evidence")
     if not isinstance(evidence, list) or not all(isinstance(c, dict) for c in evidence):
         raise ValueError("Invalid acceptance evidence")
+
+    for c in commands:
+        if "command" not in c:
+            raise ValueError("Malformed command evidence: missing command field")
+        if "status" in c:
+            raise ValueError("Malformed command evidence: status field used instead of result")
+        res = c.get("result")
+        if res not in {"PASS", "FAIL", "NOT_RUN"}:
+            raise ValueError(f"Malformed command result: {res!r}; expected PASS, FAIL, or NOT_RUN")
+        if res == "PASS":
+            if type(c.get("exit_code")) is not int or c.get("exit_code") != 0:
+                raise ValueError("Command with result PASS must have integer exit_code 0")
+
+    for e in evidence:
+        if "id" in e and "acceptance_id" not in e:
+            raise ValueError("Malformed acceptance evidence: id field used instead of acceptance_id")
+        if "acceptance_id" not in e:
+            raise ValueError("Malformed acceptance evidence: missing acceptance_id field")
+        if "status" in e:
+            raise ValueError("Malformed acceptance evidence: status field used instead of result")
+        res = e.get("result")
+        if res not in {"PASS", "FAIL", "NOT_RUN"}:
+            raise ValueError(f"Malformed acceptance result: {res!r}; expected PASS, FAIL, or NOT_RUN")
+        if not e.get("evidence"):
+            raise ValueError("Malformed acceptance evidence: missing evidence content")
+
     required = [item["command"] for item in task["checks"].get("required", [])]
     passed = sum(any(c.get("command") == command and type(c.get("exit_code")) is int
                      and c["exit_code"] == 0 and c.get("result") == "PASS" for c in commands)
@@ -92,6 +118,141 @@ def evidence_counts(task, receipt):
     ac_passed = sum(any(e.get("acceptance_id") == item["id"] and e.get("result") == "PASS"
                         and e.get("evidence") for e in evidence) for item in task["acceptance"])
     return passed, len(required), ac_passed, len(task["acceptance"])
+
+
+def validate_unverified_items(task, unverified_items):
+    """Only structured optional NOT_RUN items whose command matches task.checks.optional may remain unverified."""
+    if not isinstance(unverified_items, list):
+        return ["unverified_items must be a list"]
+    if not unverified_items:
+        return []
+    optional_commands = [
+        item["command"] if isinstance(item, dict) else item
+        for item in task.get("checks", {}).get("optional", [])
+    ]
+    required_commands = [
+        item["command"] if isinstance(item, dict) else item
+        for item in task.get("checks", {}).get("required", [])
+    ]
+    errors = []
+    for item in unverified_items:
+        if not isinstance(item, dict):
+            errors.append(f"Unstructured unverified item: {item!r}; must be mapping")
+            continue
+        cmd = item.get("command")
+        if not cmd:
+            errors.append("Unverified item missing command")
+            continue
+        if cmd in required_commands:
+            errors.append(f"Required check {cmd!r} cannot be unverified")
+            continue
+        if cmd not in optional_commands:
+            errors.append(f"Unverified item command {cmd!r} does not match any task.checks.optional command")
+            continue
+        if item.get("result") != "NOT_RUN":
+            errors.append(f"Unverified item {cmd!r} result must be NOT_RUN; got {item.get('result')!r}")
+            continue
+        reason = item.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(f"Unverified item {cmd!r} requires nonempty reason")
+            continue
+    return errors
+
+
+def validate_known_issues_done(executor, qa, review):
+    known_issues = executor.get("known_issues") or []
+    if not isinstance(known_issues, list):
+        return ["Executor known_issues must be a list"]
+    if not known_issues:
+        return []
+
+    errors = []
+    if review.get("verdict") != "PASS_WITH_NOTES" or qa.get("verdict") != "PASS_WITH_NOTES":
+        errors.append("Reported known issues require matching PASS_WITH_NOTES review and QA verdicts")
+
+    exec_issue_texts = []
+    for idx, item in enumerate(known_issues):
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict):
+            if "text" in item and "issue" not in item:
+                errors.append(f"Executor known issue [{idx}] uses alias 'text'; field 'issue' required")
+            if "description" in item and "issue" not in item:
+                errors.append(f"Executor known issue [{idx}] uses alias 'description'; field 'issue' required")
+            text = (item.get("issue") or "").strip()
+        else:
+            errors.append(f"Executor known issue [{idx}] malformed type: {type(item).__name__}")
+            continue
+        if not text:
+            errors.append(f"Executor known issue [{idx}] has empty issue text")
+        elif text in exec_issue_texts:
+            errors.append(f"Duplicate executor known issue text: {text!r}")
+        else:
+            exec_issue_texts.append(text)
+
+    if "issues_review" in qa:
+        errors.append("QA issues_review alias is not permitted; use known_issues_review")
+
+    qa_reviews = qa.get("known_issues_review")
+    if not isinstance(qa_reviews, list):
+        errors.append("QA known_issues_review must be a list when executor reports known issues")
+        return errors
+
+    if len(qa_reviews) != len(known_issues):
+        errors.append(
+            f"One-to-one independent QA disposition required: {len(known_issues)} issues reported, {len(qa_reviews)} reviewed"
+        )
+
+    reviewed_texts = []
+    for i, item in enumerate(qa_reviews):
+        if not isinstance(item, dict):
+            errors.append(f"QA issue review [{i}] must be a mapping")
+            continue
+        if "text" in item and "issue" not in item:
+            errors.append(f"QA issue review [{i}] uses alias 'text'; field 'issue' required")
+        issue_text = (item.get("issue") or "").strip()
+        if not issue_text:
+            errors.append(f"QA issue review [{i}] missing issue text")
+        elif issue_text in reviewed_texts:
+            errors.append(f"Duplicate QA issue review for issue {issue_text!r}")
+        elif issue_text not in exec_issue_texts:
+            errors.append(f"QA issue review [{i}] references unrelated issue {issue_text!r}")
+        else:
+            reviewed_texts.append(issue_text)
+
+        disposition = item.get("disposition")
+        if disposition != "ACCEPTED_RESIDUAL":
+            errors.append(f"QA issue review [{i}] disposition is {disposition!r}; only ACCEPTED_RESIDUAL allows DONE")
+        evidence = item.get("evidence_checked")
+        if not isinstance(evidence, str) or not evidence.strip():
+            errors.append(f"QA issue review [{i}] missing evidence_checked")
+
+        approval = item.get("risk_owner_approval")
+        if isinstance(approval, str):
+            errors.append(
+                f"QA issue review [{i}] plain string risk_owner_approval {approval!r} not permitted; "
+                "structured mapping required with approved_by, result APPROVED, and evidence"
+            )
+        elif not isinstance(approval, dict):
+            errors.append(f"QA issue review [{i}] missing risk-owner approval for accepted residual")
+        else:
+            approved_by = approval.get("approved_by")
+            result = approval.get("result")
+            app_evidence = approval.get("evidence")
+            if not isinstance(approved_by, str) or not approved_by.strip():
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval requires nonempty approved_by identity")
+            if result != "APPROVED":
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval result must be APPROVED; got {result!r}")
+            if not isinstance(app_evidence, str) or not app_evidence.strip():
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval requires nonempty evidence")
+            if approval.get("issue") and approval.get("issue") != issue_text:
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval issue mismatch: {approval.get('issue')!r} != {issue_text!r}")
+
+    for text in exec_issue_texts:
+        if text not in reviewed_texts:
+            errors.append(f"Executor known issue {text!r} not reviewed in QA known_issues_review")
+
+    return errors
 
 
 def done_errors(task, folder):
@@ -108,6 +269,14 @@ def done_errors(task, folder):
                 errors.append(f"{label} identity/revision mismatch: {key}")
     if executor.get("status") != "COMPLETE" or not executor.get("executor"):
         errors.append("Executor must be COMPLETE with an actual identity")
+    ws = executor.get("workspace")
+    if not isinstance(ws, dict):
+        errors.append("Executor workspace must be a mapping")
+    else:
+        for field in ("path", "branch", "base_commit", "head_commit"):
+            val = ws.get(field)
+            if not isinstance(val, str) or not val.strip():
+                errors.append(f"Executor workspace.{field} must be a nonempty string")
     if qa.get("status") != "REVIEWED" or not qa.get("reviewer") or not qa.get("reviewed_at"):
         errors.append("QA must be REVIEWED with reviewer and reviewed_at")
     if qa.get("reviewer") == executor.get("executor"):
@@ -119,8 +288,12 @@ def done_errors(task, folder):
         errors.append("Review summary required")
     if qa.get("blocking_findings") != []:
         errors.append("QA blocking_findings must be an empty list")
-    if executor.get("unverified_items") != []:
-        errors.append("Executor unverified_items must be empty")
+    unverified_errs = validate_unverified_items(task, executor.get("unverified_items") or [])
+    if unverified_errs:
+        errors.extend(unverified_errs)
+    issue_errs = validate_known_issues_done(executor, qa, review)
+    if issue_errs:
+        errors.extend(issue_errs)
     architecture = executor.get("architecture_deviation")
     if not isinstance(architecture, dict) or architecture.get("result") != "NONE":
         errors.append("Architecture deviation requires a revised contract and fresh evidence")
@@ -134,9 +307,12 @@ def done_errors(task, folder):
     scope = executor.get("scope_check")
     if not isinstance(scope, dict) or scope.get("result") != "PASS" or scope.get("out_of_scope_files") != []:
         errors.append("Executor scope check must PASS without out-of-scope files")
-    passed, required, accepted, total = evidence_counts(task, executor)
-    if passed != required or accepted != total:
-        errors.append("Required executor commands/acceptance evidence missing or failed")
+    try:
+        passed, required, accepted, total = evidence_counts(task, executor)
+        if passed != required or accepted != total:
+            errors.append("Required executor commands/acceptance evidence missing or failed")
+    except ValueError as exc:
+        errors.append(f"Invalid executor evidence: {exc}")
     acceptance = qa.get("acceptance_review")
     if not isinstance(acceptance, list) or not all(isinstance(item, dict) for item in acceptance):
         errors.append("QA acceptance_review must be a list of mappings")

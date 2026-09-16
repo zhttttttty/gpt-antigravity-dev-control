@@ -19,8 +19,9 @@ description: "在原生 Codex 角色与本地 Antigravity CLI 之间分配有界
 
     python .agents/skills/antigravity-delegate/scripts/control.py init --repo PATH --install-codex-profile
 
-初始化只创建 `.ai/tasks`、`.ai/project`、`.ai/templates/task`、`.ai/state` 和被 Git
-忽略的 `.ai/runtime`，不会覆盖已有文件。初始化后提交 `.ai` 中的契约模板与项目说明。
+初始化创建最小 `.ai/` 状态，并可能补充根 `.gitignore`；默认不覆盖已有模板。
+先确认真实仓库路径与 Git 根，再初始化；Windows 非 ASCII 路径的验证与恢复见
+[故障恢复](references/failure-recovery.md)。初始化后检查 Diff，再提交契约模板与项目说明。
 
 Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供确定性的本地执行协议，
 不是远程调度器，也不能静默替换普通 Codex 子任务。
@@ -54,7 +55,8 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
   仅作为明确批准的故障回退，不能静默替代 agy。
 - `delegated`：有界多文件实现、补充测试、独立重构或可通过命令核验的仓库审查。
 - `approval_required`：架构、认证、安全、迁移、部署、计费、破坏性或其他高风险工作。
-- 探测失败或准备与审查成本可能超过实现成本时，保持直接执行。
+- 探测失败时先停止派发并诊断；若用户指定 Antigravity，不得以成本或超时为由静默
+  切换 Codex 编码。小型低风险任务可按已授权范围直接处理。
 
 自动选择 Skill 本身仅授权规划与只读探测。变更、权限绕过或受控执行前，落实任务
 要求的审批；已有明确用户授权按当前会话范围适用。
@@ -67,17 +69,24 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
 
    读取 `capabilities.json`，不要假设参数、模式、登录或代理列表命令可用。
    控制器路由不是 `agy --mode`。全访问映射为省略 `--sandbox`；
-   自动批准对应 `--dangerously-skip-permissions`；只读审查用 `--mode plan`，
-   实现使用帮助中确认的编辑模式。全访问不会扩大契约。
+   自动批准对应 `--dangerously-skip-permissions`（当前 control.py 的历史选项名是
+   `--full-access`，实际含义是自动批准，不是沙箱开关）；只读审查用 `--mode plan`，
+   实现使用帮助中确认的编辑模式。权限绕过须绑定具体任务/Worktree 的明确授权；
+   Worktree 不是操作系统隔离。帮助、模型列表或短 READY 请求不证明账号身份、余额
+   或长任务必然可完成。
 2. 单任务生命周期用 `control.py prepare` 创建 Worktree；
    独立审查分片用 `create_review_worktree.ps1`，不要为同次执行创建两套目录。
-   使用返回的路径和分支。脏基线须按任务授权处理，不能自行假定允许。
+   使用返回的路径和分支，以及 run.json 的不可变 base_commit；派发时附实际回执模板
+   和规范字段，见[回执协议](references/receipt-protocol.md)。脏基线须按任务授权处理。
 3. 单任务使用统一 CLI；多个有界分片阅读[协作协议](references/coordination-protocol.md)，
    定义无环 `depends_on` 图并调用 `launch_agents.ps1`。扣除原生任务已占容量；
    三到四个 agy 分片须先显式协调项目预算。启动器从两个开始，成功后才扩容。
-   独立写入使用独立 Worktree；本地启动器只约束自身任务，最多重试一次，首次失败后降为单并发。
+   独立写入使用独立 Worktree；先串行 prepare，再按剩余容量并行编码，最后串行 collect。
+   不要并行运行持同仓锁的 control.py launch。启动器重试仍须计入已批准任务预算，
+   无剩余预算时 max_retries 为 0；首次失败后降为单并发。
 4. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
-   先运行 `collect_reports.ps1` 阅读摘要，再按需打开完整证据。
+   多分片先运行 `collect_reports.ps1`；单任务读 run.json 和原始回执。
+   启动器 COMPLETE/exit 0 只证明进程结束，不证明任务验收。
 5. agy 完全退出后再串行启动 Luna tester/reviewer；独立核验全部 P0/P1 的路径行号、
    测试、验收和覆盖计数及 Worktree 状态，
    将发现标记为确认、条件成立或假设。收集不会自动合并或迁入 DONE。

@@ -1,5 +1,36 @@
 # 优先读取精简回执
 
+Print 模式优先有界同步命令。实际返回 TaskId 时使用 manage_task status；返回
+CommandId 时使用 command_status；不得用定时器、schedule 或被动叙述替代轮询。
+Windows 搜索使用工作树 cwd 下的相对路径。能力门控的 stream-json 保留原始事件，
+记录 tool_info.output（兼容 result）、句柄与完成状态；缺失时间戳写 UNKNOWN，
+不推断未返回的 exit code，也不把 CLI exit0 当验收 PASS。
+
+控制器自修复例外不是通用 .agents 写权限：仅限脚本列出的批准任务版本及精确路径，
+要求真实 Git top-level、与执行源码相同的 canonical common-dir、可信 commit anchor
+祖先关系和匹配契约的前置审批，显式 protected 永远优先。复制到其他安装目录后，
+跨仓库自修复会 fail closed；该用途应运行已审查控制器仓库中的入口。
+
+## 派发时固定格式与版本
+
+向执行者提供实际 receipt.executor.yaml 模板、绝对回执路径、task_id、revision、
+attempt 和 run.json 中的 workspace/branch/base_commit。head_commit 在提交后读取。
+不得用当前主控 HEAD 猜 base；主控状态提交可能晚于 Worktree 的创建。
+
+完成状态使用 `COMPLETE`，不是 SUCCESS/COMPLETED。命令使用 `command`、
+`exit_code`、`result: PASS`，不是 status/PASSED；验收使用 `acceptance_id`、
+`result: PASS` 和非空 evidence，不是 id/status。填写真实失败和未运行结果。
+Root 在 collect 前比较回执 workspace 与 Git/run.json，不能让覆盖字段掩盖错 base。
+格式错误由执行者在获批返工中修正；Root 不代填执行者成功回执。
+
+optional NOT_RUN 和已声明残余风险不等于必需检查失败，也不等于已经接受。
+保留精确命令、原因和风险原文，独立 QA 核对，Sol 决定风险 disposition。
+已知问题保留原文及 REPORTED 标记进入 REVIEW，不自动接受风险。只有与 optional
+精确匹配且 reason 非空的结构化 NOT_RUN 可保留；必要检查失败仍阻断收集。
+DONE 要求 known_issues_review 一对一原文映射、evidence_checked，以及接受残余风险
+时结构化 risk_owner_approval（approved_by、result: APPROVED、evidence）。不接受别名
+或纯字符串批准；QA/Review 须一致 PASS_WITH_NOTES，既有人工合并门保持有效。
+
 执行者在上下文或启动提示词指定的绝对路径写核心协议回执，只提交实现，不修改任务状态。
 主控拥有状态迁移权限，执行分支上的任务副本为历史契约，不是第二个活动队列。
 

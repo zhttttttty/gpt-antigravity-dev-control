@@ -37,6 +37,12 @@ start --worktree、worktree-create 和 prepare 前提交完整契约及预期修
     python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
 Executor 只能修改可写范围，运行必要检查并写回执，不得自我批准或合并。
+Print 模式命令工作流优先采用有界同步执行，在 Windows 上搜索使用工作区 cwd 相对路径避免绝对盘符路径解析异常；
+异步/后台命令必须使用实际返回句柄进行主动轮询（TaskId 通过 manage_task status 轮询至 DONE/FAILED，
+CommandId 通过 command_status 轮询），严禁被动文本叙述等待、wait 定时器或 schedule 替代。
+能力门控的 stream-json 捕获工具启动/完成、句柄、结果与时间戳，不将进程退出码 0 或文本响应视作任务 PASS；
+原始事件日志保持可审计并具备显式降级回退，默认不禁用 slash commands。
+自修复范围豁免严格限于受批准任务版本、主控仓库、有效前置审批与指定的 7 个 .agents 路径，显式 protected 规则永远优先。
 
 原生代理由 Root 通过真实派发启动，必须指定 Worktree、契约、文件归属和回执路径。
 Luna worker 不得作为 delegated 的中转或默认实现者；agy 不可用时，Root 必须先记录
@@ -66,8 +72,10 @@ agy 完全退出后才启动 Luna tester/reviewer。只读 Reviewer 返回结果
 包括未提交修改与新增文件；修复后必须重新验证受影响的证据。
 
 DONE 校验 COMPLETE 执行回执、REVIEWED QA、独立真实身份、任务/版本/尝试绑定、
-全部必要命令和验收证据、QA 风险/范围检查、一致的结论和摘要。架构偏离、未验证事项
-阻止完成，中高风险还要求回归 PASS。启用的控制要求跨家族 PASS 或有记录的人工豁免、
+全部必要命令和验收证据、QA 风险/范围检查、一致的结论和摘要。除与 task.checks.optional
+完全匹配且注明非空理由的结构化 NOT_RUN 可选检查外，未验证事项和架构偏离阻止完成；
+存在已知问题时，必须有一对一独立 QA 处置（known_issues_review，禁止使用别名）、已检查证据、风险责任人结构化批准接受残余风险（approved_by/result: APPROVED/evidence，禁止纯字符串），
+且 QA/Review 结论一致为 PASS_WITH_NOTES。中高风险还要求回归 PASS。启用的控制要求跨家族 PASS 或有记录的人工豁免、
 有姓名和时间的合并审批、非空回滚计划。Root 仍需核实真实证据、豁免权限、回滚内容和
 实现快照，结构化回执校验不能替代这些判断。
 

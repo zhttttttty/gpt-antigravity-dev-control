@@ -1,0 +1,50 @@
+schema_version: 2
+task_id: TASK-ROUTE-002-SMOKE
+contract_revision: 1
+attempt: 1
+reviewer: gpt-5.6-luna
+status: REVIEWED
+reviewed_at: null
+risk_gate:
+  tier: low
+  result: PASS
+  missing_evidence: []
+scope_review:
+  result: PASS
+  findings: []
+acceptance_review:
+- acceptance_id: AC-S001
+  result: PASS
+  evidence: Raw write_to_file creates sole new test file, exact base/head diff verified by Luna.
+- acceptance_id: AC-S002
+  result: PASS
+  evidence: Independent targeted unittest1testOK; raw post-final-edit/postcommit tests actual outputs; synchronous commands, no background handles or timers.
+- acceptance_id: AC-S003
+  result: PASS
+  evidence: Canonical COMPLETE receipt exact workspace/base/head/two commands; final worktree clean.
+- acceptance_id: AC-S004
+  result: PASS
+  evidence: Actual collect REVIEW; Luna independent fixed90ac39a review accepts; no DONE/merge. Executor pending self-report not treated as independent evidence.
+regression_review:
+  result: PASS
+  findings: []
+security_review:
+  result: NOT_APPLICABLE
+  findings: []
+architecture_review:
+  result: PASS
+  findings: []
+cross_family_review:
+  required: false
+  result: NOT_APPLICABLE
+  reviewer: null
+  findings: []
+human_approval:
+  required: false
+  result: NOT_APPLICABLE
+  approved_by: null
+  approved_at: null
+blocking_findings: []
+non_blocking_findings:
+- Confirmed raw launch.log76-77 git log -n5 --oneline violated no-history convergence instruction. Readonly within worktree, no old task content or permission expansion; Sol accepts as non-blocking process note, not perfect compliance.
+verdict: PASS_WITH_NOTES

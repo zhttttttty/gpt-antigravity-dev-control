@@ -1,0 +1,11 @@
+schema_version: 2
+task_id: TASK-ROUTE-002-SMOKE
+attempt: 1
+verdict: PASS_WITH_NOTES
+summary: Sol final smoke PASS after Luna independent AC4/4 review at90ac39a. One real default-adapter launch within180s completed edit/test/commit/canonical receipt/collect REVIEW; no automatic DONE/merge. Installation separately validated.
+findings:
+- severity: P3
+  status: CONFIRMED
+  description: Readonly git log -n5 --oneline violated no-history convergence instruction; retained raw events. Sol accepts non-blocking note without safety/permission/AC waiver.
+follow_up_tasks: []
+state_transition: IN_PROGRESS -> REVIEW; remain REVIEW without automatic DONE/merge

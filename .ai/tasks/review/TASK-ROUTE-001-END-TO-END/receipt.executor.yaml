@@ -1,0 +1,62 @@
+schema_version: 2
+task_id: TASK-ROUTE-001-END-TO-END
+contract_revision: 2
+attempt: 2
+executor: antigravity
+status: COMPLETE
+workspace:
+  path: D:\UserData\Desktop\APP\gpt-antigravity-control-ascii\.worktrees\TASK-ROUTE-001-END-TO-END-2
+  branch: ai/local/TASK-ROUTE-001-END-TO-END-2
+  base_commit: de1f05ddfeb123d4d0b5a29de89973363bde66e9
+  head_commit: e553b323fd7fb3b7a172462d7b74c38445e3a5ff
+started_at: '2026-09-16T08:08:00Z'
+ended_at: '2026-09-16T08:17:30Z'
+changed_files:
+- .agents/skills/antigravity-delegate/references/receipt-protocol.md
+- .agents/skills/antigravity-delegate/references/workflow.md
+- .agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py
+- .agents/skills/antigravity-delegate/scripts/delegate.py
+- .agents/skills/antigravity-delegate/scripts/task_data.py
+- .agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml
+- tests/test_local_delegation.py
+- tests/test_task_protocol.py
+commands:
+- command: python -m unittest discover -s tests -v
+  exit_code: 0
+  result: PASS
+- command: python -m compileall -q .agents/skills/antigravity-delegate/scripts tests
+  exit_code: 0
+  result: PASS
+- command: git diff --check ai/route-repair-attempt2-baseline...HEAD
+  exit_code: 0
+  result: PASS
+acceptance_evidence:
+- acceptance_id: AC-R001
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests::test_argv_prompt_and_no_default_disable_slash_commands
+    and test_tool_handle_diagnostic_real_and_unknown verify prompt regression, active
+    polling of TaskId via manage_task status and CommandId via command_status, synchronous
+    bounded exit codes, and blocking of passive narration and wait timers.
+- acceptance_id: AC-R002
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests::test_stream_json_tool_events_and_malformed_handling
+    verifies parse_stream_events extracts real CLI tool_info.output, preserves available
+    timestamps or sets UNKNOWN, and defensively handles malformed/truncated events
+    without assuming text response or exit 0 is task PASS.
+- acceptance_id: AC-R003
+  result: PASS
+  evidence: tests/test_local_delegation.py::LocalDelegationTests::test_self_repair_scope_exception_positive_and_negatives
+    and tests/test_task_protocol.py::TaskProtocolTests::test_known_issues_disposition_and_residual_risk_at_done_gate
+    verify exact revision 2 self-repair scope exception for the 7 .agents paths, controller
+    repository identity check, and requirement for structured risk_owner_approval
+    rejecting aliases and plain strings.
+scope_check:
+  result: PASS
+  out_of_scope_files: []
+architecture_deviation:
+  result: NONE
+  details: null
+known_issues: []
+unverified_items: []
+notes: Carried-forward patch repaired and completed. All defects addressed and verified
+  via 73 unit tests, compilation, and clean git diff check.

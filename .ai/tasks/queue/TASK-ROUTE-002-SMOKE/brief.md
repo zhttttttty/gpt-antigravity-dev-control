@@ -1,16 +1,5 @@
-# <TASK-ID>：<标题>
+# TASK-ROUTE-002-SMOKE
 
-## 原因
-`<业务、用户或工程原因>`
-
-## 目标
-`<单一结果>`
-
-## 范围内
-- `<事项>`
-
-## 范围外
-- `<事项>`
-
-## 完成标准
-- `<用自然语言描述结果>`
+Create only tests/test_route_smoke.py using standard-library unittest with one
+deterministic sum([1, 2, 3]) == 6 assertion. Run the two exact required checks,
+commit only that file, fill runtime executor receipt, stop. No research required.

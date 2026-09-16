@@ -170,9 +170,30 @@ def validate_known_issues_done(executor, qa, review):
     if review.get("verdict") != "PASS_WITH_NOTES" or qa.get("verdict") != "PASS_WITH_NOTES":
         errors.append("Reported known issues require matching PASS_WITH_NOTES review and QA verdicts")
 
+    exec_issue_texts = []
+    for idx, item in enumerate(known_issues):
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict):
+            if "text" in item and "issue" not in item:
+                errors.append(f"Executor known issue [{idx}] uses alias 'text'; field 'issue' required")
+            if "description" in item and "issue" not in item:
+                errors.append(f"Executor known issue [{idx}] uses alias 'description'; field 'issue' required")
+            text = (item.get("issue") or "").strip()
+        else:
+            errors.append(f"Executor known issue [{idx}] malformed type: {type(item).__name__}")
+            continue
+        if not text:
+            errors.append(f"Executor known issue [{idx}] has empty issue text")
+        elif text in exec_issue_texts:
+            errors.append(f"Duplicate executor known issue text: {text!r}")
+        else:
+            exec_issue_texts.append(text)
+
+    if "issues_review" in qa:
+        errors.append("QA issues_review alias is not permitted; use known_issues_review")
+
     qa_reviews = qa.get("known_issues_review")
-    if qa_reviews is None:
-        qa_reviews = qa.get("issues_review")
     if not isinstance(qa_reviews, list):
         errors.append("QA known_issues_review must be a list when executor reports known issues")
         return errors
@@ -182,19 +203,54 @@ def validate_known_issues_done(executor, qa, review):
             f"One-to-one independent QA disposition required: {len(known_issues)} issues reported, {len(qa_reviews)} reviewed"
         )
 
+    reviewed_texts = []
     for i, item in enumerate(qa_reviews):
         if not isinstance(item, dict):
             errors.append(f"QA issue review [{i}] must be a mapping")
             continue
+        if "text" in item and "issue" not in item:
+            errors.append(f"QA issue review [{i}] uses alias 'text'; field 'issue' required")
+        issue_text = (item.get("issue") or "").strip()
+        if not issue_text:
+            errors.append(f"QA issue review [{i}] missing issue text")
+        elif issue_text in reviewed_texts:
+            errors.append(f"Duplicate QA issue review for issue {issue_text!r}")
+        elif issue_text not in exec_issue_texts:
+            errors.append(f"QA issue review [{i}] references unrelated issue {issue_text!r}")
+        else:
+            reviewed_texts.append(issue_text)
+
         disposition = item.get("disposition")
         if disposition != "ACCEPTED_RESIDUAL":
             errors.append(f"QA issue review [{i}] disposition is {disposition!r}; only ACCEPTED_RESIDUAL allows DONE")
         evidence = item.get("evidence_checked")
         if not isinstance(evidence, str) or not evidence.strip():
             errors.append(f"QA issue review [{i}] missing evidence_checked")
-        approval = item.get("risk_owner_approval") or item.get("approved_by") or item.get("risk_owner")
-        if not isinstance(approval, str) or not approval.strip():
+
+        approval = item.get("risk_owner_approval")
+        if isinstance(approval, str):
+            errors.append(
+                f"QA issue review [{i}] plain string risk_owner_approval {approval!r} not permitted; "
+                "structured mapping required with approved_by, result APPROVED, and evidence"
+            )
+        elif not isinstance(approval, dict):
             errors.append(f"QA issue review [{i}] missing risk-owner approval for accepted residual")
+        else:
+            approved_by = approval.get("approved_by")
+            result = approval.get("result")
+            app_evidence = approval.get("evidence")
+            if not isinstance(approved_by, str) or not approved_by.strip():
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval requires nonempty approved_by identity")
+            if result != "APPROVED":
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval result must be APPROVED; got {result!r}")
+            if not isinstance(app_evidence, str) or not app_evidence.strip():
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval requires nonempty evidence")
+            if approval.get("issue") and approval.get("issue") != issue_text:
+                errors.append(f"QA issue review [{i}] structured risk_owner_approval issue mismatch: {approval.get('issue')!r} != {issue_text!r}")
+
+    for text in exec_issue_texts:
+        if text not in reviewed_texts:
+            errors.append(f"Executor known issue {text!r} not reviewed in QA known_issues_review")
 
     return errors
 
@@ -213,6 +269,14 @@ def done_errors(task, folder):
                 errors.append(f"{label} identity/revision mismatch: {key}")
     if executor.get("status") != "COMPLETE" or not executor.get("executor"):
         errors.append("Executor must be COMPLETE with an actual identity")
+    ws = executor.get("workspace")
+    if not isinstance(ws, dict):
+        errors.append("Executor workspace must be a mapping")
+    else:
+        for field in ("path", "branch", "base_commit", "head_commit"):
+            val = ws.get(field)
+            if not isinstance(val, str) or not val.strip():
+                errors.append(f"Executor workspace.{field} must be a nonempty string")
     if qa.get("status") != "REVIEWED" or not qa.get("reviewer") or not qa.get("reviewed_at"):
         errors.append("QA must be REVIEWED with reviewer and reviewed_at")
     if qa.get("reviewer") == executor.get("executor"):

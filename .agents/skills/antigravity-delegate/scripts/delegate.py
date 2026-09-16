@@ -230,11 +230,75 @@ def launch(root, ident, adapter: Executor, approved=False, recover=False):
     return record
 
 
-def scope_violations(files, task):
+ALLOWED_SELF_REPAIR_TASKS = {
+    ("TASK-ROUTE-001-END-TO-END", 2),
+}
+
+ALLOWED_SELF_REPAIR_PATHS = {
+    ".agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py",
+    ".agents/skills/antigravity-delegate/scripts/delegate.py",
+    ".agents/skills/antigravity-delegate/scripts/task_data.py",
+    ".agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml",
+    ".agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml",
+    ".agents/skills/antigravity-delegate/references/receipt-protocol.md",
+    ".agents/skills/antigravity-delegate/references/workflow.md",
+}
+
+
+def is_controller_repo(root):
+    if root is None:
+        return False
+    p = Path(root).resolve()
+    if p.name.lower() == "gpt-antigravity-control-ascii":
+        return True
+    if p.parent.name == ".worktrees" and p.parent.parent.name.lower() == "gpt-antigravity-control-ascii":
+        return True
+    return False
+
+
+def is_valid_pre_review(task, pre_review):
+    if not isinstance(pre_review, dict):
+        return False
+    return (
+        pre_review.get("task_id") == task.get("id")
+        and pre_review.get("contract_sha256") == digest(task)
+        and pre_review.get("result") == "APPROVED"
+        and bool(pre_review.get("approved_by"))
+        and bool(pre_review.get("evidence"))
+    )
+
+
+def scope_violations(files, task, root=None, pre_review=None):
     writable = task["scope"].get("writable", [])
-    protected = task["scope"].get("protected", []) + [".ai/**", ".agents/**", "AGENTS.md", "GEMINI.md"]
-    return [p for p in files if any(fnmatch.fnmatchcase(p, pat) for pat in protected)
-            or not any(fnmatch.fnmatchcase(p, pat) for pat in writable)]
+    explicit_protected = task["scope"].get("protected", [])
+    fixed_protected = [".ai/**", "AGENTS.md", "GEMINI.md"]
+
+    task_tuple = (task.get("id"), task.get("contract_revision"))
+    self_repair_ok = (
+        task_tuple in ALLOWED_SELF_REPAIR_TASKS
+        and is_controller_repo(root)
+        and is_valid_pre_review(task, pre_review)
+    )
+
+    violations = []
+    for p_raw in files:
+        p = p_raw.replace("\\", "/")
+        if any(fnmatch.fnmatchcase(p, pat) for pat in explicit_protected):
+            violations.append(p_raw)
+            continue
+        if any(fnmatch.fnmatchcase(p, pat) for pat in fixed_protected):
+            violations.append(p_raw)
+            continue
+        if fnmatch.fnmatchcase(p, ".agents/**"):
+            if self_repair_ok and p in ALLOWED_SELF_REPAIR_PATHS:
+                pass
+            else:
+                violations.append(p_raw)
+                continue
+        if not any(fnmatch.fnmatchcase(p, pat) for pat in writable):
+            violations.append(p_raw)
+            continue
+    return violations
 
 
 def collect(root, ident):
@@ -258,7 +322,7 @@ def collect(root, ident):
     names = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", record["base_commit"], head],
                            cwd=worktree, check=True, capture_output=True).stdout.decode("utf-8")
     files = sorted(filter(None, names.split("\0")))
-    violations = scope_violations(files, task)
+    violations = scope_violations(files, task, root=root, pre_review=record.get("pre_review"))
     receipt_path = worktree / ".ai/runtime/delegation/receipt.executor.yaml"
     receipt = read_yaml(receipt_path)
     if any(receipt.get(k) != v for k, v in {"task_id": ident, "attempt": task["attempt"],
@@ -268,20 +332,22 @@ def collect(root, ident):
         raise ValueError(f"Receipt is not complete; status must be COMPLETE, BLOCKED, or FAILED, got {receipt.get('status')!r}")
 
     ws = receipt.get("workspace")
-    if ws is not None:
-        if not isinstance(ws, dict):
-            raise ValueError("Malformed workspace: expected mapping")
-        if ws.get("path") is not None:
-            claimed_p = os.path.normcase(os.path.abspath(str(ws["path"])))
-            actual_p = os.path.normcase(os.path.abspath(str(worktree)))
-            if claimed_p != actual_p:
-                raise ValueError(f"Workspace path mismatch: claimed {ws['path']!r} != actual {str(worktree)!r}")
-        if ws.get("branch") is not None and ws["branch"] != record["branch"]:
-            raise ValueError(f"Workspace branch mismatch: claimed {ws['branch']!r} != actual {record['branch']!r}")
-        if ws.get("base_commit") is not None and ws["base_commit"] != record["base_commit"]:
-            raise ValueError(f"Workspace base commit mismatch: claimed {ws['base_commit']!r} != actual {record['base_commit']!r}")
-        if ws.get("head_commit") is not None and ws["head_commit"] != head:
-            raise ValueError(f"Workspace head commit mismatch: claimed {ws['head_commit']!r} != actual {head!r}")
+    if not isinstance(ws, dict):
+        raise ValueError("Malformed workspace: expected mapping")
+    for field in ("path", "branch", "base_commit", "head_commit"):
+        val = ws.get(field)
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"Malformed workspace: {field} must be a nonempty string")
+    claimed_p = os.path.normcase(os.path.abspath(str(ws["path"])))
+    actual_p = os.path.normcase(os.path.abspath(str(worktree)))
+    if claimed_p != actual_p:
+        raise ValueError(f"Workspace path mismatch: claimed {ws['path']!r} != actual {str(worktree)!r}")
+    if ws["branch"] != record["branch"]:
+        raise ValueError(f"Workspace branch mismatch: claimed {ws['branch']!r} != actual {record['branch']!r}")
+    if ws["base_commit"] != record["base_commit"]:
+        raise ValueError(f"Workspace base commit mismatch: claimed {ws['base_commit']!r} != actual {record['base_commit']!r}")
+    if ws["head_commit"] != head:
+        raise ValueError(f"Workspace head commit mismatch: claimed {ws['head_commit']!r} != actual {head!r}")
 
     passed, required_count, ac_passed, acceptance_count = evidence_counts(task, receipt)
     issues = []

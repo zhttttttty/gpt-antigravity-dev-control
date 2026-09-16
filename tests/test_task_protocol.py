@@ -58,8 +58,9 @@ class TaskProtocolTests(unittest.TestCase):
 
     def fill_evidence(self):
         executor = read_yaml(self.folder / "receipt.executor.yaml")
-        executor.update(status="COMPLETE", executor="worker-1", commands=[
-            {"command": "verify", "exit_code": 0, "result": "PASS"}],
+        executor.update(status="COMPLETE", executor="worker-1",
+            workspace={"path": str(self.root), "branch": "ai/TASK-TEST", "base_commit": "0" * 40, "head_commit": "0" * 40},
+            commands=[{"command": "verify", "exit_code": 0, "result": "PASS"}],
             acceptance_evidence=[{"acceptance_id": "AC-001", "result": "PASS", "evidence": "verified result"}])
         executor["scope_check"] = {"result": "PASS", "out_of_scope_files": []}
         write_yaml(self.folder / "receipt.executor.yaml", executor)
@@ -101,6 +102,8 @@ class TaskProtocolTests(unittest.TestCase):
             ("receipt.executor.yaml", "attempt", 2),
             ("receipt.executor.yaml", "task_id", "TASK-OTHER"),
             ("receipt.executor.yaml", "contract_revision", 2),
+            ("receipt.executor.yaml", "workspace", None),
+            ("receipt.executor.yaml", "workspace", {"path": "", "branch": "b", "base_commit": "0", "head_commit": "0"}),
             ("receipt.executor.yaml", "commands", [{"command": "verify", "exit_code": False, "result": "PASS"}]),
             ("receipt.executor.yaml", "acceptance_evidence", []),
             ("receipt.executor.yaml", "unverified_items", ["missing check"]),
@@ -300,7 +303,8 @@ class TaskProtocolTests(unittest.TestCase):
         # 3. QA disposition is BLOCKING -> rejects
         qa["known_issues_review"] = [
             {"issue": "non-blocking latency spike in test helper", "disposition": "BLOCKING",
-             "evidence_checked": "verified latency logs", "risk_owner_approval": "gpt-5.6-sol"}
+             "evidence_checked": "verified latency logs",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
         ]
         write_yaml(self.folder / "receipt.qa.yaml", qa)
         with self.assertRaisesRegex(SystemExit, "DONE rejected"):
@@ -309,7 +313,8 @@ class TaskProtocolTests(unittest.TestCase):
         # 4. QA disposition missing evidence_checked -> rejects
         qa["known_issues_review"] = [
             {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
-             "evidence_checked": "", "risk_owner_approval": "gpt-5.6-sol"}
+             "evidence_checked": "",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
         ]
         write_yaml(self.folder / "receipt.qa.yaml", qa)
         with self.assertRaisesRegex(SystemExit, "DONE rejected"):
@@ -324,10 +329,68 @@ class TaskProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "DONE rejected"):
             self.transition("DONE")
 
-        # 6. Accepted residual with one-to-one QA disposition, evidence checked, risk-owner approval, PASS_WITH_NOTES -> DONE succeeds
+        # 5b. QA disposition plain string risk_owner_approval -> rejects
         qa["known_issues_review"] = [
             {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
-             "evidence_checked": "verified latency logs and bounded risk", "risk_owner_approval": "gpt-5.6-sol"}
+             "evidence_checked": "verified latency logs", "risk_owner_approval": "gpt-5.6-sol"}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 5c. QA disposition alias issues_review -> rejects
+        qa_alias = copy.deepcopy(qa)
+        qa_alias.pop("known_issues_review")
+        qa_alias["issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "verified latency logs",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa_alias)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 5d. QA item alias text -> rejects
+        qa_item_alias = copy.deepcopy(qa)
+        qa_item_alias["known_issues_review"] = [
+            {"text": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "verified latency logs",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa_item_alias)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 6. QA issue review references unrelated issue text -> rejects
+        qa["known_issues_review"] = [
+            {"issue": "unrelated cosmetic glitch", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "checked",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 7. Duplicate executor known issues -> rejects
+        executor["known_issues"] = ["issue-a", "issue-a"]
+        write_yaml(self.folder / "receipt.executor.yaml", executor)
+        qa["known_issues_review"] = [
+            {"issue": "issue-a", "disposition": "ACCEPTED_RESIDUAL", "evidence_checked": "checked",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}},
+            {"issue": "issue-a", "disposition": "ACCEPTED_RESIDUAL", "evidence_checked": "checked",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}},
+        ]
+        write_yaml(self.folder / "receipt.qa.yaml", qa)
+        with self.assertRaisesRegex(SystemExit, "DONE rejected"):
+            self.transition("DONE")
+
+        # 8. Restore single issue with structured risk_owner_approval mapping -> DONE succeeds
+        executor["known_issues"] = ["non-blocking latency spike in test helper"]
+        write_yaml(self.folder / "receipt.executor.yaml", executor)
+        qa["known_issues_review"] = [
+            {"issue": "non-blocking latency spike in test helper", "disposition": "ACCEPTED_RESIDUAL",
+             "evidence_checked": "verified latency logs and bounded risk",
+             "risk_owner_approval": {"approved_by": "gpt-5.6-sol", "result": "APPROVED", "evidence": "ADR-001"}}
         ]
         write_yaml(self.folder / "receipt.qa.yaml", qa)
         self.transition("DONE")

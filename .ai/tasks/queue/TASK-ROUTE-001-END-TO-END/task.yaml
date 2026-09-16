@@ -1,0 +1,86 @@
+schema_version: 2
+id: TASK-ROUTE-001-END-TO-END
+title: Repair bounded Antigravity route completion
+status: READY
+contract_revision: 1
+attempt: 1
+execution:
+  mode: approval_required
+  adapter: antigravity_cli
+  model: configured_default
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 1
+  escalation: codex_review
+planning:
+  milestone: M1
+  epic: EPIC-001
+  requirements:
+  - FR-001
+  depends_on: []
+  risk: high
+roles:
+  planner: gpt-5.6-sol
+  executor: antigravity
+  reviewer: gpt-5.6-luna
+objective: Repair real task-handle completion, structured execution evidence and Windows
+  search routing without weakening receipt review gates
+scope:
+  writable:
+  - .agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py
+  - .agents/skills/antigravity-delegate/scripts/delegate.py
+  - .agents/skills/antigravity-delegate/scripts/task_data.py
+  - .agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml
+  - .agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml
+  - .agents/skills/antigravity-delegate/references/receipt-protocol.md
+  - .agents/skills/antigravity-delegate/references/workflow.md
+  - tests/test_local_delegation.py
+  - tests/test_task_protocol.py
+  protected:
+  - .ai/project/ARCHITECTURE.md
+  - migrations/**
+  out_of_scope:
+  - Do not edit old task histories, business code, permissions or sandbox defaults; no push/merge/deploy. Do not import dirty run2 edits or weaken risk/identity gates to get PASS.
+  - This new route-repair task does not reset exhausted TASK-CONTROL budgets. One launch900s, no recovery.
+authority:
+  architecture_change: false
+  database_schema_change: false
+  public_api_change: false
+  auth_security_change: true
+  major_dependency_change: false
+  deployment_change: false
+isolation:
+  worktree: true
+  base_branch: ai/route-repair-baseline
+  branch: ai/local/TASK-ROUTE-001-END-TO-END-1
+acceptance:
+- id: AC-R001
+  criterion: Print-mode command workflow uses actual returned handle; TaskId is polled via manage_task status, CommandId via command_status. No passive narration, wait timers or schedule completion. Prefer synchronous bounded commands and relative-path search in worktree cwd on Windows.
+  evidence: Prompt regression checks and real tool-handle diagnostic; preserve unknown cases as blockers.
+- id: AC-R002
+  criterion: Capability-gated stream-json captures tool start/completion, handle, result and timestamps without assuming text response/exit0 is task PASS; raw event log remains auditable and fallback is explicit.
+  evidence: Offline stream events, malformed/truncated events, failure and timeout tests; no default disable-slash-commands.
+- id: AC-R003
+  criterion: Complete canonical receipt workspace identity and required evidence fail closed; known issue QA mapping and risk-owner approval are not weakened. Self-repair scope exception is limited to this exact approved task, exact allowed seven .agents paths in actual controller repository, with explicit protections winning.
+  evidence: Negative tests for null/missing/mismatch workspace, wrong task/approval/extra path and risk disposition mismatch; required unittest passes.
+checks:
+  required:
+  - command: python -m unittest discover -s tests -v
+  - command: python -m compileall -q .agents/skills/antigravity-delegate/scripts tests
+  - command: git diff --check ai/route-repair-baseline...HEAD
+  optional: []
+risk_controls:
+  rollback_plan_required: true
+  cross_family_review_required: true
+  human_merge_approval_required: true
+artifacts:
+  brief: brief.md
+  context: context.md
+  executor_receipt: receipt.executor.yaml
+  qa_receipt: receipt.qa.yaml
+  review: review.yaml
+  rollback: rollback.md
+metadata:
+  created_at: '2026-09-16T07:46:41+00:00'
+  updated_at: '2026-09-16T07:46:41+00:00'
+  created_by: gpt-5.6-sol

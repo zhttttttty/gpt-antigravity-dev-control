@@ -798,9 +798,8 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertTrue(any(e.get("status") == "MALFORMED" for e in m_events))
 
     def test_self_repair_scope_exception_positive_and_negatives(self):
-        # Setup controller repository identity
-        controller_repo = Path(self.temp.name) / "gpt-antigravity-control-ascii"
-        controller_repo.mkdir(exist_ok=True)
+        # Only the actual executing controller repository qualifies.
+        controller_repo = REPO
 
         task_repair = {
             "id": "TASK-ROUTE-001-END-TO-END",
@@ -885,6 +884,38 @@ class LocalDelegationTests(unittest.TestCase):
         for fixed in [".ai/project/ARCHITECTURE.md", "AGENTS.md", "GEMINI.md"]:
             v_fixed = d.scope_violations([fixed], task_repair, root=controller_repo, pre_review=valid_pre_review)
             self.assertIn(fixed, v_fixed)
+
+
+    def test_controller_identity_actual_repository_and_own_worktree(self):
+        self.assertTrue(d.is_controller_repo(REPO))
+        common = Path(d.git(REPO, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+        self.assertTrue(d.is_controller_repo(common.parent))
+        self.assertFalse(d.is_controller_repo(REPO / "tests"))
+
+    def test_controller_identity_same_name_non_git_or_missing(self):
+        fake = self.root / "gpt-antigravity-control-ascii"
+        self.assertFalse(d.is_controller_repo(fake))
+        fake.mkdir()
+        self.assertFalse(d.is_controller_repo(fake))
+        self.assertFalse(d.is_controller_repo(None))
+
+    def test_controller_identity_same_name_fake_git_repository(self):
+        fake = self.root / "gpt-antigravity-control-ascii"
+        fake.mkdir()
+        d.git(fake, "init", "-b", "main")
+        self.assertFalse(d.is_controller_repo(fake))
+
+    def test_controller_identity_foreign_common_dir_with_trusted_history(self):
+        foreign = self.root / "gpt-antigravity-control-ascii"
+        d.git(self.root, "clone", "--shared", "--no-checkout", str(REPO), str(foreign))
+        d.git(foreign, "merge-base", "--is-ancestor", d.CONTROLLER_COMMIT_ANCHOR, "HEAD")
+        self.assertFalse(d.is_controller_repo(foreign))
+
+    def test_controller_identity_missing_anchor_and_git_error_fail_closed(self):
+        with patch.object(d, "CONTROLLER_COMMIT_ANCHOR", "0" * 40):
+            self.assertFalse(d.is_controller_repo(REPO))
+        with patch.object(d, "git", side_effect=OSError("git unavailable")):
+            self.assertFalse(d.is_controller_repo(REPO))
 
 
 if __name__ == "__main__":

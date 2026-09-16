@@ -245,15 +245,31 @@ ALLOWED_SELF_REPAIR_PATHS = {
 }
 
 
+CONTROLLER_COMMIT_ANCHOR = "e55f40f82168dcf2c0aeb2b927a5783473f78d0e"
+
+
 def is_controller_repo(root):
+    """Identify this controller's Git repository, never a directory-name lookalike."""
     if root is None:
         return False
-    p = Path(root).resolve()
-    if p.name.lower() == "gpt-antigravity-control-ascii":
+    try:
+        target = Path(root).resolve(strict=True)
+        if not target.is_dir():
+            return False
+        top = Path(git(target, "rev-parse", "--show-toplevel")).resolve(strict=True)
+        if target != top:
+            return False
+        source = Path(__file__).resolve(strict=True).parent
+        source_common = Path(git(source, "rev-parse", "--path-format=absolute",
+                                 "--git-common-dir")).resolve(strict=True)
+        target_common = Path(git(target, "rev-parse", "--path-format=absolute",
+                                 "--git-common-dir")).resolve(strict=True)
+        if source_common != target_common:
+            return False
+        git(target, "merge-base", "--is-ancestor", CONTROLLER_COMMIT_ANCHOR, "HEAD")
         return True
-    if p.parent.name == ".worktrees" and p.parent.parent.name.lower() == "gpt-antigravity-control-ascii":
-        return True
-    return False
+    except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError):
+        return False
 
 
 def is_valid_pre_review(task, pre_review):

@@ -93,7 +93,82 @@ def route(task):
     return {"mode": mode, "reason": "risk/architecture gate" if gated else "planner selection (legacy defaults to direct)"}
 
 
-def prepare(root, ident, approved=False, approval=None):
+def _reuse_terminal_worktree(root, ident, task, previous_record, previous_run_dir,
+                             previous_run_number, planning_base, next_branch,
+                             previous_process_exited):
+    """Validate and retarget one terminal worktree without moving its candidate."""
+    if task["isolation"].get("reuse_terminal_worktree") is not True:
+        raise ValueError("Reuse requires isolation.reuse_terminal_worktree: true")
+    if previous_process_exited is not True:
+        raise ValueError("Reuse requires explicit confirmation that the previous process tree exited")
+    if previous_record.get("phase") not in {"LAUNCH_FAILED", "NEEDS_ATTENTION"}:
+        raise ValueError("Reuse requires a terminal unsuccessful previous run")
+    if previous_record.get("task_id") != ident or previous_record.get("attempt") != previous_run_number:
+        raise ValueError("Previous run identity mismatch")
+    recorded_run_dir = Path(previous_record.get("run_dir", ""))
+    if recorded_run_dir.resolve() != previous_run_dir.resolve():
+        raise ValueError("Previous run directory identity mismatch")
+    old_hash = previous_record.get("contract_sha256")
+    if not isinstance(old_hash, str) or len(old_hash) != 64:
+        raise ValueError("Previous contract identity is missing or malformed")
+    worktree = Path(previous_record.get("worktree", ""))
+    if not worktree.is_dir():
+        raise ValueError("Previous worktree is missing; refuse candidate reconstruction")
+    actual_top = Path(git(worktree, "rev-parse", "--show-toplevel")).resolve()
+    if actual_top != worktree.resolve():
+        raise ValueError("Previous worktree identity mismatch")
+    managed_root = (root / ".worktrees").resolve()
+    try:
+        common_path = Path(os.path.commonpath([str(actual_top), str(managed_root)]))
+    except ValueError as exc:
+        raise ValueError("Previous worktree is outside the managed worktree root") from exc
+    if common_path != managed_root:
+        raise ValueError("Previous worktree is outside the managed worktree root")
+    root_common = Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")).resolve()
+    worktree_common = Path(git(worktree, "rev-parse", "--path-format=absolute", "--git-common-dir")).resolve()
+    if root_common != worktree_common:
+        raise ValueError("Previous worktree belongs to a different Git common directory")
+    registered = {
+        Path(line.removeprefix("worktree ")).resolve()
+        for line in git(root, "worktree", "list", "--porcelain").splitlines()
+        if line.startswith("worktree ")
+    }
+    if actual_top not in registered:
+        raise ValueError("Previous worktree is not registered with the controller repository")
+    old_branch = previous_record.get("branch")
+    if git(worktree, "branch", "--show-current") != old_branch:
+        raise ValueError("Previous worktree branch changed")
+    base = previous_record.get("base_commit")
+    if git(worktree, "rev-parse", "HEAD") != base:
+        raise ValueError("Reuse requires HEAD to remain at the previous immutable base")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base, planning_base],
+        cwd=root, check=False, capture_output=True,
+    ).returncode == 0
+    if not ancestor:
+        raise ValueError("Previous candidate base is not an ancestor of the current planning base")
+
+    raw = git(worktree, "status", "--porcelain=v1", "--untracked-files=all", "-z")
+    entries = [entry for entry in raw.split("\0") if entry]
+    if any(not entry.startswith("?? ") for entry in entries):
+        raise ValueError("Reuse forbids tracked, staged, deleted, or renamed candidate changes")
+    actual = sorted(entry[3:].replace("\\", "/") for entry in entries)
+    expected = sorted(task["scope"].get("writable", []))
+    if not expected or any(any(c in path for c in "*?[") for path in expected):
+        raise ValueError("Reuse requires an exact, non-glob writable manifest")
+    if actual != expected:
+        raise ValueError(f"Reuse candidate manifest mismatch: expected {expected!r}, got {actual!r}")
+    branch_exists = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{next_branch}"],
+        cwd=root, check=False, capture_output=True,
+    ).returncode == 0
+    if branch_exists:
+        raise ValueError("Reuse target branch already exists")
+    return worktree, old_branch, base, actual
+
+
+def prepare(root, ident, approved=False, approval=None, reuse_terminal_worktree=False,
+            previous_process_exited=False):
     state, folder, task = load_task(root, ident)
     if state != "READY":
         raise ValueError("prepare requires READY")
@@ -124,18 +199,42 @@ def prepare(root, ident, approved=False, approval=None):
         raise ValueError("Commit or stash workspace changes, including task contract, before prepare")
     if task["isolation"].get("worktree") is not True:
         raise ValueError("Local delegation requires isolation.worktree: true")
+    contract_reuse = task["isolation"].get("reuse_terminal_worktree") is True
+    if contract_reuse != reuse_terminal_worktree:
+        raise ValueError(
+            "Terminal worktree reuse requires both isolation.reuse_terminal_worktree: true "
+            "and --reuse-terminal-worktree"
+        )
     base_ref = task["isolation"].get("base_branch", "HEAD")
-    base = git(root, "rev-parse", "--verify", f"{base_ref}^{{commit}}")
-    if base != git(root, "rev-parse", "HEAD"):
+    planning_base = git(root, "rev-parse", "--verify", f"{base_ref}^{{commit}}")
+    if planning_base != git(root, "rev-parse", "HEAD"):
         raise ValueError("Configured base must equal current HEAD containing the committed task; no silent fallback")
     logs = root / ".ai/runtime/logs" / ident
-    previous = list(logs.glob("run-*")) if logs.exists() else []
+    previous = sorted(
+        logs.glob("run-*"), key=lambda path: int(path.name.split("-")[-1])
+    ) if logs.exists() else []
     if len(previous) >= attempts:
         raise ValueError("Attempt budget exhausted; escalate to Codex review")
     number = len(previous) + 1
     run_dir = logs / f"run-{number}"
     worktree = root / ".worktrees" / f"{ident}-{number}"
     branch = f"ai/local/{ident}-{number}"
+    base = planning_base
+    reuse = None
+    if reuse_terminal_worktree:
+        if not previous:
+            raise ValueError("Reuse requires a previous run")
+        previous_record = json.loads((previous[-1] / "run.json").read_text(encoding="utf-8"))
+        worktree, old_branch, base, candidate_files = _reuse_terminal_worktree(
+            root, ident, task, previous_record, previous[-1], number - 1,
+            planning_base, branch, previous_process_exited
+        )
+        reuse = {
+            "from_run": int(previous[-1].name.split("-")[-1]),
+            "old_branch": old_branch,
+            "candidate_files": candidate_files,
+            "previous_process_exit_confirmed": True,
+        }
     chunks = []
     for name in ("task.yaml", "brief.md", "context.md", "rollback.md"):
         path = folder / name
@@ -154,10 +253,24 @@ def prepare(root, ident, approved=False, approval=None):
               "base_commit": base, "branch": branch, "worktree": str(worktree),
               "run_dir": str(run_dir), "created_at": time.time(), "phase": "PREPARING",
               "pre_review": approval_data}
+    if reuse:
+        record["reused_terminal_worktree"] = reuse
     save(run_dir / "run.json", record)
+    renamed = False
     try:
-        worktree.parent.mkdir(exist_ok=True)
-        git(root, "worktree", "add", "-b", branch, str(worktree), base)
+        if reuse:
+            checked_worktree, _, checked_base, checked_files = _reuse_terminal_worktree(
+                root, ident, task, previous_record, previous[-1], number - 1,
+                planning_base, branch, previous_process_exited
+            )
+            if (checked_worktree != worktree or checked_base != base
+                    or checked_files != candidate_files):
+                raise ValueError("Reuse candidate changed during final pre-rename validation")
+            git(worktree, "branch", "-m", branch)
+            renamed = True
+        else:
+            worktree.parent.mkdir(exist_ok=True)
+            git(root, "worktree", "add", "-b", branch, str(worktree), base)
         runtime = worktree / ".ai/runtime/delegation"
         runtime.mkdir(parents=True, exist_ok=True)
         atomic(runtime / "context.md", pack)
@@ -170,6 +283,13 @@ def prepare(root, ident, approved=False, approval=None):
         record["phase"] = "PREPARED"
     except BaseException as exc:
         record.update(phase="BLOCKED", error=str(exc))
+        if renamed:
+            try:
+                git(worktree, "branch", "-m", reuse["old_branch"])
+                record["branch"] = reuse["old_branch"]
+                record["reused_terminal_worktree"]["rolled_back"] = True
+            except (OSError, subprocess.SubprocessError):
+                record["branch_rollback_error"] = "manual inspection required"
         raise
     finally:
         save(run_dir / "run.json", record)
@@ -443,6 +563,10 @@ def main():
             p.add_argument("--approve", action="store_true")
         if command == "prepare":
             p.add_argument("--approval-file")
+            p.add_argument("--reuse-terminal-worktree", action="store_true",
+                           help="Reuse the immediately previous terminal worktree after exact-manifest validation")
+            p.add_argument("--confirm-previous-process-exited", action="store_true",
+                           help="Record operator confirmation that the previous executor process tree exited")
         if command == "launch":
             p.add_argument("--executable", default="agy")
             p.add_argument("--args-file", type=Path)
@@ -465,7 +589,9 @@ def main():
                 _, _, task = load_task(root, args.task_id)
                 result = {**route(task), "contract_sha256": digest(task)}
             elif args.command == "prepare":
-                result = prepare(root, args.task_id, args.approve, args.approval_file)
+                result = prepare(root, args.task_id, args.approve, args.approval_file,
+                                 args.reuse_terminal_worktree,
+                                 args.confirm_previous_process_exited)
             elif args.command == "launch":
                 if args.full_access and not args.approve:
                     raise ValueError("--full-access requires explicit --approve")

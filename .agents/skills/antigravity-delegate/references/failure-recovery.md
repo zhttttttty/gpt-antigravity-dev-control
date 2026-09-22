@@ -34,6 +34,20 @@ max1、失败、询问，形成流程死循环；也不得用“跑通”为名�
 
 ## 本地 agy
 
+若终止的 agy 只留下精确的未跟踪候选且没有实现提交，禁止 Root 代为提交、stash/apply
+或复制代码。Sol 可在新 revision 明确允许复用，任务必须设置
+`isolation.reuse_terminal_worktree: true`，writable 必须是无 glob 的精确候选清单，然后运行：
+
+    control.py prepare TASK-ID --approve --approval-file PATH --reuse-terminal-worktree --confirm-previous-process-exited
+
+Root 必须先按 PID/进程树证据确认旧执行器已退出；确认 flag 会被写入新 run。
+控制器只接受紧邻的 `LAUNCH_FAILED`/`NEEDS_ATTENTION` run、匹配的任务/run/contract 身份、
+同一 Git common-dir 中已注册且位于 `.worktrees` 下的原 Worktree/分支、
+`HEAD == previous base_commit`、零 tracked/staged 修改且全部未跟踪路径与 writable 清单
+完全相等的情况，并在重命名前再次核验。旧 base 必须是当前治理基线的祖先。
+它保留目录和文件，重命名为新 attempt 分支，写入新的 context/receipt，
+并把原 base_commit 写入新 run。任一检查失败即停止；不得退化为新 Worktree 搬运候选。
+
 从首个具体故障恢复，避免循环尝试：
 
 1. 参数无效或不支持：停止，重新探测，仅映射帮助中支持的参数。

@@ -233,6 +233,130 @@ class LocalDelegationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "budget exhausted"):
             self.prepare()
 
+    def test_reuse_terminal_worktree_preserves_exact_untracked_candidate(self):
+        self.task["scope"]["writable"] = ["src/result.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare()
+        worktree = Path(first["worktree"])
+        candidate = worktree / "src/result.txt"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_text("attempt-one-candidate\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8"))
+        failed["phase"] = "LAUNCH_FAILED"
+        d.save(run_one, failed)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task["contract_revision"] = 2
+        self.task["attempt"] = 2
+        self.task["isolation"]["reuse_terminal_worktree"] = True
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "requires both"):
+            d.prepare(self.root, "TASK-TEST", True)
+        with self.assertRaisesRegex(ValueError, "process tree exited"):
+            d.prepare(self.root, "TASK-TEST", True, reuse_terminal_worktree=True)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            second = d.prepare(
+                self.root, "TASK-TEST", True, reuse_terminal_worktree=True,
+                previous_process_exited=True
+            )
+        self.assertEqual(Path(second["worktree"]), worktree)
+        self.assertEqual(second["base_commit"], first["base_commit"])
+        self.assertEqual(second["branch"], "ai/local/TASK-TEST-2")
+        self.assertEqual(d.git(worktree, "branch", "--show-current"), second["branch"])
+        self.assertEqual(candidate.read_text(encoding="utf-8"), "attempt-one-candidate\n")
+        self.assertEqual(second["reused_terminal_worktree"]["candidate_files"], ["src/result.txt"])
+        receipt = d.read_yaml(worktree / ".ai/runtime/delegation/receipt.executor.yaml")
+        self.assertEqual((receipt["contract_revision"], receipt["attempt"]), (2, 2))
+
+    def test_reuse_terminal_worktree_rejects_manifest_drift(self):
+        self.task["scope"]["writable"] = ["src/result.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare()
+        worktree = Path(first["worktree"])
+        (worktree / "extra.txt").write_text("unexpected\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8"))
+        failed["phase"] = "LAUNCH_FAILED"
+        d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task["contract_revision"] = 2
+        self.task["attempt"] = 2
+        self.task["isolation"]["reuse_terminal_worktree"] = True
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "manifest mismatch"):
+            d.prepare(self.root, "TASK-TEST", True, reuse_terminal_worktree=True,
+                      previous_process_exited=True)
+
+    def test_reuse_failure_rolls_branch_and_record_back_consistently(self):
+        self.task["scope"]["writable"] = ["src/result.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare()
+        worktree = Path(first["worktree"])
+        candidate = worktree / "src/result.txt"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_text("candidate\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8"))
+        failed["phase"] = "LAUNCH_FAILED"
+        d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task["contract_revision"] = 2
+        self.task["attempt"] = 2
+        self.task["isolation"]["reuse_terminal_worktree"] = True
+        self.write_task(); self.commit()
+        with patch.object(d, "write_yaml", side_effect=OSError("forced write failure")):
+            with self.assertRaisesRegex(OSError, "forced write failure"):
+                d.prepare(self.root, "TASK-TEST", True,
+                          reuse_terminal_worktree=True,
+                          previous_process_exited=True)
+        run_two = self.root / ".ai/runtime/logs/TASK-TEST/run-2/run.json"
+        record = json.loads(run_two.read_text(encoding="utf-8"))
+        self.assertEqual(record["phase"], "BLOCKED")
+        self.assertEqual(record["branch"], first["branch"])
+        self.assertTrue(record["reused_terminal_worktree"]["rolled_back"])
+        self.assertEqual(d.git(worktree, "branch", "--show-current"), first["branch"])
+        self.assertEqual(candidate.read_text(encoding="utf-8"), "candidate\n")
+
+    def test_reuse_rejects_previous_record_identity_drift(self):
+        self.task["scope"]["writable"] = ["src/result.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare()
+        worktree = Path(first["worktree"])
+        candidate = worktree / "src/result.txt"
+        candidate.parent.mkdir(parents=True)
+        candidate.write_text("candidate\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8"))
+        failed.update(phase="LAUNCH_FAILED", task_id="TASK-OTHER")
+        d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task["contract_revision"] = 2
+        self.task["attempt"] = 2
+        self.task["isolation"]["reuse_terminal_worktree"] = True
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "identity mismatch"):
+            d.prepare(self.root, "TASK-TEST", True,
+                      reuse_terminal_worktree=True,
+                      previous_process_exited=True)
+
     def test_cli_prepare_is_single_json_document(self):
         cp = subprocess.run([sys.executable, str(REPO / ".agents/skills/antigravity-delegate/scripts/delegate.py"),
                              "--repo", str(self.root), "prepare", "TASK-TEST", "--approve"],

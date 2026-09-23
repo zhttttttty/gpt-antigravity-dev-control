@@ -24,7 +24,7 @@ direct 下 agy adapter 不启用。任何后端都须遵守架构与风险门，
 | 意图 | agy 映射 | 约束 |
 |---|---|---|
 | 访问一次性 Worktree | 省略 `--sandbox` | 不扩大契约和授权范围 |
-| 自动批准工具调用 | 帮助确认后添加 `--dangerously-skip-permissions` | 须明确批准且使用隔离 Worktree |
+| 自动批准工具调用 | `control.py launch --approve --auto-approve` 映射为 `--dangerously-skip-permissions` | 须明确批准且使用隔离 Worktree；`--full-access` 仅兼容旧调用 |
 | 只读审查 | `--mode plan` | 提示词禁止创建、修改、删除、提交、合并和推送 |
 | 正常实现 | 支持时用 `--mode accept-edits` | 保留范围、回执、测试和审查门 |
 

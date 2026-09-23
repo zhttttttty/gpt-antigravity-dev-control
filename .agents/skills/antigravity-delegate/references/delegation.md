@@ -40,7 +40,7 @@ agy.log 可能含路径、Prompt 或私有代码，应只保存在本地并在�
 
 可信的一次性 Worktree 可以显式使用：
 
-    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --auto-approve
 
 该选项只向 agy 传递 permission-bypass 参数，不授予管理员权限，也不会移除 Scope、
 Receipt、Review 或人工合并门。永远不要静默启用。

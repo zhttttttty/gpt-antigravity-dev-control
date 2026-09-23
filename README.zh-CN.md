@@ -124,7 +124,8 @@ python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 默认两个并发、大型只读任务健康探测后最多四个并发、独立写入 Worktree、失败一次后降为单并发重试，以及
 `summary.json`/`handoff.md` 精简验收交接。
 
-一次性可信 Worktree 如需免逐项确认，可显式增加 `--full-access`。它只向 agy
+一次性可信 Worktree 如需免逐项确认，可显式增加 `--auto-approve`（旧名
+`--full-access` 仅保留兼容）。它只向 agy
 传递 `--dangerously-skip-permissions`，不授予 Windows 管理员权限，也不会绕过
 任务范围、回执、验收和人工合并门。
 

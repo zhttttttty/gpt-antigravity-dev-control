@@ -166,7 +166,7 @@ and human merge authority. See [Execution Modes](.agents/skills/antigravity-dele
 For a disposable trusted worktree only:
 
 ```sh
-python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --auto-approve
 ```
 
 This explicitly passes agy's `--dangerously-skip-permissions`; it does not grant

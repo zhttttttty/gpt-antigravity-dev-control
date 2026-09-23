@@ -9,10 +9,12 @@ Antigravity 实现者。Sol 是唯一规划、架构和最终验收决策者；L
 
 ## 选择执行者
 
-- Root 直接执行：局部小修改，或协调成本大于收益的任务，仍保留必要独立审查。
+- Root 直接执行：局部小修改、需要高判断力的正确性/安全审查、微妙语言运行时语义，
+  或协调成本大于收益的任务，仍保留必要独立审查。
 - 原生 Codex：Luna high explorer/researcher 收集事实，tester 独立验证，reviewer
   返回发现。worker 仅是 agy 不可用后的显式回退。使用真实 `spawn_agent` 并保留返回身份。
-- 本地 Antigravity：具有可执行验收条件、值得承担准备和隔离成本的有界实现。
+- 本地 Antigravity：具有可执行验收条件、值得承担准备和隔离成本的有界实现、测试补充、
+  样板代码或机械重构。其只读审查适合作为首轮扫描，不作为最终 PASS 来源。
   先探测 agy，再执行既有 prepare/launch/collect 和审批流程。
 
 原生实现使用 `execution.mode: direct`，`roles.executor` 填 worker 等实际角色；切换前
@@ -49,6 +51,8 @@ tester 和 reviewer 必须核验同一快照：记录 HEAD、工作区 Diff/状�
 
 Luna reviewer 只能返回 PASS、PASS_WITH_NOTES、REWORK 或 BLOCKED 建议。Sol Root
 复核契约、Diff、测试和回执后作最终判断；不得把 Luna 建议直接写成 Root 已完成验收。
+agy 的 PASS 约束更强：必须由独立 Luna/Sol 复核，且对不可变性、验证、安全边界等契约
+至少设计一个反例或负向检查；仅复述现有测试不能证明语义正确。
 
 ## 容量与所有权
 

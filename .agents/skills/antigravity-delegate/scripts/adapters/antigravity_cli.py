@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import re
+import time
 from pathlib import Path
 
 import yaml
@@ -46,7 +47,10 @@ class AntigravityCLI:
         if self.mode == "plan":
             prompt += (
                 "This is a read-only review. Do not create, edit, delete, commit, merge, or push files. "
-                "Inspect the requested scope and write only the final report to stdout. "
+                "Inspect the requested scope and write only the final report to stdout; do not narrate progress. "
+                "Treat existing tests as evidence, not proof: challenge each named correctness, validation, "
+                "immutability, or security invariant with at least one adversarial counterexample when applicable, "
+                "including public constructors and language/runtime escape hatches. Report uncertainty instead of PASS. "
             )
         else:
             prompt += (
@@ -57,6 +61,7 @@ class AntigravityCLI:
                 "immediately poll manage_task status for that exact TaskId until DONE/FAILED; "
                 "if CommandId use command_status. Do not use schedule, timers, or passively narrate waiting. "
                 "Read returned actual stdout/stderr; do not claim missing exit codes. "
+                "Before COMPLETE, exercise negative or adversarial cases for contract invariants that ordinary happy-path tests may miss. "
                 "Run the required test commands and save actual test output locally. Commit implementation files only. "
                 "Fill the executor receipt at {receipt} using native file editing, then STOP. "
                 "Do not read/write QA or review files, expand scope, merge, push, or claim unexecuted tests passed. "
@@ -75,10 +80,11 @@ class AntigravityCLI:
                     *mode_args, *access_args, capabilities["interactive_arg"], prompt,
                 ]
             else:
+                print_timeout_seconds = max(1, self.timeout - 5)
                 args = [
                     "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
                     *format_args,
-                    *mode_args, *access_args, "--print-timeout", "20m",
+                    *mode_args, *access_args, "--print-timeout", f"{print_timeout_seconds}s",
                     f"{capabilities['print_arg']}={prompt}",
                 ]
         if not isinstance(args, list) or not args or not all(isinstance(x, str) for x in args):
@@ -174,6 +180,7 @@ class AntigravityCLI:
         path = logs / "launch.log"
         result = {"exit_code": None, "log": str(path), "cli_log": str(logs / "agy.log"),
                   "mode": "interactive" if self.interactive else "print", "completion": "UNKNOWN"}
+        started = time.monotonic()
         with path.open("wb") as output:
             try:
                 if self.interactive:
@@ -189,21 +196,39 @@ class AntigravityCLI:
             except KeyboardInterrupt:
                 result.update(error="Interactive session interrupted; inspect worktree before recovery",
                               diagnostic="INTERRUPTED")
-        if not self.interactive and path.is_file():
+        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        result["output_bytes"] = path.stat().st_size if path.is_file() else 0
+        if not self.interactive and self.args is None and path.is_file():
             try:
                 events = parse_stream_events(path.read_text(encoding="utf-8", errors="replace"))
                 if events:
                     events_path = logs / "events.json"
                     events_path.write_text(json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8")
                     result["stream_events"] = str(events_path)
+                    result["output_format"] = (
+                        "INVALID" if any(event.get("status") in {"MALFORMED", "MIXED_OUTPUT"} for event in events)
+                        else "VALID"
+                    )
                 else:
                     result["stream_events"] = "EMPTY_OR_UNSUPPORTED"
+                    result["output_format"] = "EMPTY"
             except Exception:
                 result["stream_events"] = "PARSE_ERROR"
+                result["output_format"] = "INVALID"
         else:
-            result["stream_events"] = "NOT_APPLICABLE" if self.interactive else "LOG_MISSING"
+            result["stream_events"] = "NOT_APPLICABLE" if (self.interactive or self.args is not None) else "LOG_MISSING"
+            result["output_format"] = "NOT_APPLICABLE" if (self.interactive or self.args is not None) else "MISSING"
         if "diagnostic" not in result:
-            result["diagnostic"] = diagnose(receipt, [path, logs / "agy.log"])
+            base_diagnostic = diagnose(receipt, [path, logs / "agy.log"])
+            if result.get("output_format") == "INVALID":
+                result["secondary_diagnostic"] = "FORMAT_INVALID"
+                result["diagnostic"] = (
+                    base_diagnostic
+                    if base_diagnostic in {"PERMISSION_BLOCKED", "EMPTY_OUTPUT", "AUTH_REQUIRED"}
+                    else "FORMAT_INVALID"
+                )
+            else:
+                result["diagnostic"] = base_diagnostic
         return result
 
 
@@ -217,7 +242,10 @@ def parse_stream_events(log_content):
     for line in lines:
         line_str = line.decode("utf-8", errors="replace") if isinstance(line, (bytes, bytearray)) else str(line)
         line_str = line_str.strip()
-        if not line_str or not line_str.startswith("{"):
+        if not line_str:
+            continue
+        if not line_str.startswith("{"):
+            events.append({"event": "unexpected_text", "raw": line_str[:200], "status": "MIXED_OUTPUT"})
             continue
         try:
             payload = json.loads(line_str)
@@ -457,8 +485,17 @@ def diagnose(receipt, logs):
             with path.open("rb") as stream:
                 stream.seek(max(0, path.stat().st_size - 262144))
                 text += stream.read(262144).decode("utf-8", errors="replace").lower()
-    if "soft-denying tool confirmation" in text:
+    permission_markers = (
+        "soft-denying tool confirmation",
+        "headless mode cannot prompt",
+        "permission that headless mode cannot prompt for",
+        "auto-denied",
+        "add an allow-rule under permissions.allow",
+    )
+    if any(marker in text for marker in permission_markers):
         return "PERMISSION_BLOCKED"
+    if "no output produced" in text:
+        return "EMPTY_OUTPUT"
 
     login_warn_markers = ("you are not logged into antigravity",)
     auth_success_markers = (

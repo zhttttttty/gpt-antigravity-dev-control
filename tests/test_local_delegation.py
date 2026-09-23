@@ -205,6 +205,7 @@ class LocalDelegationTests(unittest.TestCase):
         record = d.launch(self.root, "TASK-TEST", adapter, True)
         self.assertEqual(record["phase"], "NEEDS_ATTENTION")
         self.assertEqual(record["launch"]["diagnostic"], "NO_COMPLETION_EVIDENCE")
+        self.assertEqual(record["launch"]["output_format"], "NOT_APPLICABLE")
         with self.assertRaisesRegex(ValueError, "only once"):
             d.launch(self.root, "TASK-TEST", adapter, True)
         with self.assertRaisesRegex(ValueError, "not complete"):
@@ -396,6 +397,10 @@ class LocalDelegationTests(unittest.TestCase):
         log = self.root / "fake-cli.log"
         log.write_text('access_token=SECRET\nPrint mode: soft-denying tool confirmation "ViewFile" at step 2')
         self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "PERMISSION_BLOCKED")
+        log.write_text('jetski: no output produced — a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.')
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "PERMISSION_BLOCKED")
+        log.write_text('jetski: no output produced')
+        self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "EMPTY_OUTPUT")
         log.write_text('You are not logged into Antigravity.')
         self.assertEqual(diagnose(self.root / "absent.yaml", [log]), "AUTH_REQUIRED")
         log.write_text('You are not logged into Antigravity.\nPrint mode: silent auth succeeded')
@@ -454,6 +459,14 @@ class LocalDelegationTests(unittest.TestCase):
         self.prepare()
         cp = subprocess.run([sys.executable, str(REPO / '.agents/skills/antigravity-delegate/scripts/delegate.py'),
                              '--repo', str(self.root), 'launch', 'TASK-TEST', '--full-access'],
+                            capture_output=True, text=True)
+        self.assertEqual(cp.returncode, 2)
+        self.assertIn('requires explicit --approve', cp.stderr)
+
+    def test_auto_approve_requires_approval_at_cli_boundary(self):
+        self.prepare()
+        cp = subprocess.run([sys.executable, str(REPO / '.agents/skills/antigravity-delegate/scripts/delegate.py'),
+                             '--repo', str(self.root), 'launch', 'TASK-TEST', '--auto-approve'],
                             capture_output=True, text=True)
         self.assertEqual(cp.returncode, 2)
         self.assertIn('requires explicit --approve', cp.stderr)
@@ -920,6 +933,50 @@ class LocalDelegationTests(unittest.TestCase):
         # Does not crash, records malformed line or parses valid ones
         self.assertTrue(any(e.get("event") == "tool_start" for e in m_events))
         self.assertTrue(any(e.get("status") == "MALFORMED" for e in m_events))
+
+        mixed_events = parse_stream_events('progress narration\n{"event":"result","result":{"status":"SUCCESS"}}')
+        self.assertEqual(mixed_events[0]["status"], "MIXED_OUTPUT")
+        self.assertEqual(mixed_events[1]["event"], "session_result")
+
+    def test_managed_mixed_output_is_invalid_but_permission_has_precedence(self):
+        logs = self.root / ".ai/runtime/mixed-output"
+        logs.mkdir(parents=True)
+        receipt = logs / "receipt.yaml"
+        receipt.write_text("status: COMPLETE\n")
+        adapter = AntigravityCLI(sys.executable)
+
+        def fake_run(argv, **kwargs):
+            if "--help" in argv:
+                return type("Completed", (), {
+                    "returncode": 0,
+                    "stdout": "--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--output-format stream-json\n",
+                })()
+            kwargs["stdout"].write(b'progress narration\n{"event":"result","result":{"status":"SUCCESS"}}\n')
+            return type("Completed", (), {"returncode": 0})()
+
+        with patch("antigravity_cli.subprocess.run", side_effect=fake_run):
+            result = adapter.launch(self.root, logs / "context.md", receipt, logs)
+        self.assertEqual(result["output_format"], "INVALID")
+        self.assertEqual(result["diagnostic"], "FORMAT_INVALID")
+
+        permission_adapter = AntigravityCLI(sys.executable)
+
+        def fake_permission_run(argv, **kwargs):
+            if "--help" in argv:
+                return type("Completed", (), {
+                    "returncode": 0,
+                    "stdout": "--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--output-format stream-json\n",
+                })()
+            kwargs["stdout"].write(
+                b'jetski: no output produced - a permission that headless mode cannot prompt for was auto-denied.\n'
+                b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+            )
+            return type("Completed", (), {"returncode": 0})()
+
+        with patch("antigravity_cli.subprocess.run", side_effect=fake_permission_run):
+            permission_result = permission_adapter.launch(self.root, logs / "context.md", receipt, logs)
+        self.assertEqual(permission_result["diagnostic"], "PERMISSION_BLOCKED")
+        self.assertEqual(permission_result["secondary_diagnostic"], "FORMAT_INVALID")
 
     def test_self_repair_scope_exception_positive_and_negatives(self):
         # Only the actual executing controller repository qualifies.

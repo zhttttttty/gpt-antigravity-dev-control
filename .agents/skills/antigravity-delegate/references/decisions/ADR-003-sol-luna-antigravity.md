@@ -1,6 +1,6 @@
 # ADR-003：Sol 主控、Luna high 核验与 Antigravity 实现
 
-状态：按用户要求接受，2026-09-15。
+状态：已由 [ADR-004](ADR-004-adaptive-delegation.md) 部分取代，2026-10-01。
 
 ## 背景
 

@@ -62,8 +62,10 @@ class AntigravityCLI:
                 "if CommandId use command_status. Do not use schedule, timers, or passively narrate waiting. "
                 "Read returned actual stdout/stderr; do not claim missing exit codes. "
                 "Before COMPLETE, exercise negative or adversarial cases for contract invariants that ordinary happy-path tests may miss. "
-                "Run the required test commands and save actual test output locally. Commit implementation files only. "
-                "Fill the executor receipt at {receipt} using native file editing, then STOP. "
+                "Run focused checks needed while coding, but do not spend the model session rerunning the full contract matrix; "
+                "the controller verify phase owns authoritative command execution. Commit implementation files only. "
+                "Fill actual executor identity and acceptance evidence in {receipt}, set status IMPLEMENTED, then STOP. "
+                "Do not invent command results or workspace hashes; controller verify fills those fields. "
                 "Do not read/write QA or review files, expand scope, merge, push, or claim unexecuted tests passed. "
             )
         prompt += "If a permission is denied, report the blocker; do not search alternative directories."

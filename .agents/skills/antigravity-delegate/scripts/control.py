@@ -10,7 +10,7 @@ import sys
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CORE = {"create", "validate", "transition", "start", "worktree-create", "worktree-remove"}
-DELEGATION = {"probe", "route", "prepare", "launch", "collect", "diagnose"}
+DELEGATION = {"probe", "route", "prepare", "launch", "verify", "collect", "diagnose"}
 HELP = """usage: control.py [--repo PATH] COMMAND [ARGS...]
 
 Unified local AI development control plane.
@@ -20,7 +20,7 @@ Task protocol commands:
   create, validate, transition, start, worktree-create, worktree-remove
 
 Local delegation commands:
-  probe, route, prepare, launch, collect, status, diagnose
+  probe, route, prepare, launch, verify, collect, status, diagnose
 """
 
 

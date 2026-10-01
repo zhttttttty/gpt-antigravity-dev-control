@@ -3,6 +3,9 @@ task_id: TASK-XXX
 contract_revision: 1
 attempt: 1
 executor: antigravity
+# Executor writes IMPLEMENTED plus acceptance evidence after committing. The
+# deterministic controller verify phase runs contract checks and changes this
+# to COMPLETE or FAILED. Legacy executors may still write COMPLETE directly.
 status: NOT_STARTED
 
 workspace:

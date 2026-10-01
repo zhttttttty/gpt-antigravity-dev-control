@@ -13,9 +13,14 @@ Antigravity 实现者。Sol 是唯一规划、架构和最终验收决策者；L
   或协调成本大于收益的任务，仍保留必要独立审查。
 - 原生 Codex：Luna high explorer/researcher 收集事实，tester 独立验证，reviewer
   返回发现。worker 仅是 agy 不可用后的显式回退。使用真实 `spawn_agent` 并保留返回身份。
-- 本地 Antigravity：具有可执行验收条件、值得承担准备和隔离成本的有界实现、测试补充、
+- 本地 Antigravity：判断强度低、具有可执行验收条件、值得承担准备和隔离成本的有界实现、测试补充、
   样板代码或机械重构。其只读审查适合作为首轮扫描，不作为最终 PASS 来源。
-  先探测 agy，再执行既有 prepare/launch/collect 和审批流程。
+  先探测 agy，再执行 prepare/launch/verify/collect 和审批流程。
+
+新任务同时声明 `work_type`、`judgment`、`context_continuity` 与
+`acceptance_determinism`。semantic/security/architecture、高判断、强连续性或低确定性
+验收默认 direct。`approval_required` 是审批门，不代表 Antigravity 自动成为写入者；
+高判断任务强制委派须有结构化 routing override 的批准人与证据。
 
 原生实现使用 `execution.mode: direct`，`roles.executor` 填 worker 等实际角色；切换前
 必须记录 agy 不可用或不适用的原因，并由 Sol Root 明确批准，不能静默降级。
@@ -40,7 +45,8 @@ direct 不启用 `execution.adapter: antigravity_cli`。需隔离时先运行
 变更和未提交内容、命令与退出码、验收映射、报告/日志路径及阻塞项。
 原始日志保留本地；摘要是审查起点，不能替代 Diff 或失败输出。
 
-本地 collect 核验自身证据，成功也只进入 REVIEW。
+本地实现完成后优先运行 verify，让控制器执行分层检查并记录确定性证据；collect 核验
+实现者验收声明与控制器证据，成功也只进入 REVIEW。
 原生证据由 Root 显式检查并说明限制。沿用 Executor/QA Receipt 与 review.yaml；
 只读审查者返回发现，Root 如实转录，不能声称其独立执行了他人的审查。
 记录实际身份和检查，不把模型偏好复制为执行证据。

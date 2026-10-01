@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -65,6 +66,15 @@ class LocalDelegationTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             return d.prepare(self.root, "TASK-TEST", True)
 
+    def approval(self, name="verify-approval.yaml"):
+        path = self.root / ".ai/runtime" / name
+        d.atomic(path, yaml.safe_dump({
+            "task_id": "TASK-TEST", "contract_sha256": d.digest(self.task),
+            "result": "APPROVED", "approved_by": "human",
+            "evidence": "approved exact contract verification matrix",
+        }))
+        return path
+
     def finish(self, record, name="src/result.txt", missing=False):
         wt = Path(record["worktree"])
         file = wt / name
@@ -96,6 +106,33 @@ class LocalDelegationTests(unittest.TestCase):
     def test_legacy_is_direct(self):
         self.task.pop("execution")
         self.assertEqual(d.route(self.task)["mode"], "direct")
+
+    def test_adaptive_route_keeps_high_judgment_work_direct(self):
+        self.task["planning"].update(
+            work_type="semantic", judgment="high",
+            context_continuity="high", acceptance_determinism="low",
+        )
+        routed = d.route(self.task)
+        self.assertEqual((routed["mode"], routed["backend"]), ("direct", "direct"))
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "Direct task"):
+            self.prepare()
+
+        self.task["execution"]["routing_override"] = {
+            "result": "APPROVED", "approved_by": "human",
+            "evidence": "bounded mechanical implementation despite semantic review",
+        }
+        routed = d.route(self.task)
+        self.assertEqual((routed["mode"], routed["backend"]),
+                         ("approval_required", "antigravity"))
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "Pre-review approval"):
+            self.prepare()
+
+    def test_high_risk_high_judgment_is_approval_gated_direct(self):
+        self.task["planning"].update(risk="high", work_type="security", judgment="high")
+        routed = d.route(self.task)
+        self.assertEqual((routed["mode"], routed["backend"]), ("approval_required", "direct"))
 
     def test_confirmation_required(self):
         with self.assertRaisesRegex(ValueError, "confirmation"):
@@ -150,6 +187,100 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertEqual(self.collect(), result)
         with self.assertRaises(SystemExit):
             d.ai.transition(self.root, "TASK-TEST", "DONE")
+
+    def test_controller_verify_runs_staged_checks_and_completes_receipt(self):
+        command = f'"{sys.executable}" -c "print(123)"'
+        self.task["checks"].update(
+            adversarial_probes=[], fast_gate=[{"command": command}],
+            final_gate=[], required=[],
+        )
+        self.write_task(); self.commit()
+        record = self.prepare()
+        wt = Path(record["worktree"])
+        target = wt / "src/result.txt"
+        target.parent.mkdir(parents=True)
+        target.write_text("implemented\n", encoding="utf-8")
+        d.git(wt, "add", "src/result.txt"); d.git(wt, "commit", "-m", "implementation")
+        receipt_path = wt / ".ai/runtime/delegation/receipt.executor.yaml"
+        receipt = d.read_yaml(receipt_path)
+        receipt.update(
+            executor="antigravity", status="IMPLEMENTED",
+            acceptance_evidence=[{"acceptance_id": "AC-001", "result": "PASS", "evidence": "src/result.txt"}],
+        )
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        run = json.loads(run_path.read_text(encoding="utf-8")); run["phase"] = "AWAITING_VERIFICATION"; d.save(run_path, run)
+
+        verified = d.verify(self.root, "TASK-TEST", True, 20, approval=self.approval())
+        self.assertEqual(verified["status"], "PASS")
+        receipt = d.read_yaml(receipt_path)
+        self.assertEqual(receipt["status"], "COMPLETE")
+        self.assertEqual(receipt["commands"][0]["stage"], "fast_gate")
+        self.assertEqual(self.collect()["task_state"], "REVIEW")
+
+    def test_controller_verify_stops_after_failed_probe(self):
+        fail = f'"{sys.executable}" -c "raise SystemExit(7)"'
+        marker = self.root / "should-not-run.txt"
+        final = f'"{sys.executable}" -c "from pathlib import Path; Path(r\'{marker}\').write_text(r\'bad\')"'
+        self.task["checks"].update(
+            adversarial_probes=[{"command": fail}], fast_gate=[],
+            final_gate=[{"command": final}], required=[],
+        )
+        self.write_task(); self.commit()
+        record = self.prepare(); wt = Path(record["worktree"])
+        target = wt / "src/result.txt"; target.parent.mkdir(parents=True); target.write_text("x")
+        d.git(wt, "add", "src/result.txt"); d.git(wt, "commit", "-m", "implementation")
+        receipt_path = wt / ".ai/runtime/delegation/receipt.executor.yaml"
+        receipt = d.read_yaml(receipt_path); receipt.update(executor="antigravity", status="IMPLEMENTED")
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        run = json.loads(run_path.read_text(encoding="utf-8")); run["phase"] = "AWAITING_VERIFICATION"; d.save(run_path, run)
+        result = d.verify(self.root, "TASK-TEST", True, 20, approval=self.approval())
+        self.assertEqual(result["phase"], "VERIFICATION_FAILED")
+        self.assertFalse(marker.exists())
+        commands = d.read_yaml(receipt_path)["commands"]
+        self.assertEqual([item["result"] for item in commands], ["FAIL", "NOT_RUN"])
+
+    def test_controller_verify_rejects_failed_executor_and_unverified_collect(self):
+        command = f'"{sys.executable}" -c "print(123)"'
+        self.task["checks"].update(
+            adversarial_probes=[], fast_gate=[{"command": command}],
+            final_gate=[], required=[],
+        )
+        self.write_task(); self.commit()
+        record = self.prepare(); wt = Path(record["worktree"])
+        target = wt / "src/result.txt"; target.parent.mkdir(parents=True); target.write_text("x")
+        d.git(wt, "add", "src/result.txt"); d.git(wt, "commit", "-m", "implementation")
+        receipt_path = wt / ".ai/runtime/delegation/receipt.executor.yaml"
+        receipt = d.read_yaml(receipt_path)
+        receipt.update(executor="antigravity", status="FAILED")
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        run = json.loads(run_path.read_text(encoding="utf-8")); run["phase"] = "AWAITING_VERIFICATION"; d.save(run_path, run)
+        with self.assertRaisesRegex(ValueError, "status IMPLEMENTED"):
+            d.verify(self.root, "TASK-TEST", True, 20)
+        receipt["status"] = "COMPLETE"; d.write_yaml(receipt_path, receipt)
+        with self.assertRaisesRegex(ValueError, "not ready for collection|require controller verification"):
+            self.collect()
+
+    def test_shell_check_requires_contract_bound_approval(self):
+        command = f'"{sys.executable}" -c "print(123)"'
+        self.task["checks"].update(
+            adversarial_probes=[], fast_gate=[{"command": command, "shell": True}],
+            final_gate=[], required=[],
+        )
+        self.write_task(); self.commit()
+        record = self.prepare(); wt = Path(record["worktree"])
+        target = wt / "src/result.txt"; target.parent.mkdir(parents=True); target.write_text("x")
+        d.git(wt, "add", "src/result.txt"); d.git(wt, "commit", "-m", "implementation")
+        receipt_path = wt / ".ai/runtime/delegation/receipt.executor.yaml"
+        receipt = d.read_yaml(receipt_path); receipt.update(executor="antigravity", status="IMPLEMENTED")
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        run = json.loads(run_path.read_text(encoding="utf-8")); run["phase"] = "AWAITING_VERIFICATION"; d.save(run_path, run)
+        with self.assertRaisesRegex(ValueError, "Pre-review approval"):
+            d.verify(self.root, "TASK-TEST", True, 20)
+        self.assertFalse((Path(record["run_dir"]) / "verify").exists())
 
     def test_missing_receipt_not_success(self):
         self.prepare()
@@ -274,6 +405,98 @@ class LocalDelegationTests(unittest.TestCase):
         self.assertEqual(second["reused_terminal_worktree"]["candidate_files"], ["src/result.txt"])
         receipt = d.read_yaml(worktree / ".ai/runtime/delegation/receipt.executor.yaml")
         self.assertEqual((receipt["contract_revision"], receipt["attempt"]), (2, 2))
+
+    def test_reuse_tracked_worktree_requires_contract_and_approval(self):
+        tracked = self.root / "src/result.txt"
+        tracked.parent.mkdir(parents=True); tracked.write_text("base\n", encoding="utf-8")
+        self.task["scope"]["writable"] = ["src/result.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare(); worktree = Path(first["worktree"])
+        (worktree / "src/result.txt").write_text("partial\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8")); failed["phase"] = "LAUNCH_FAILED"; d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task.update(contract_revision=2, attempt=2)
+        self.task["isolation"]["reuse_tracked_worktree"] = True
+        self.write_task(); self.commit()
+        approval = self.root / ".ai/runtime/tracked-approval.yaml"
+        candidate_diff = subprocess.run(
+            ["git", "diff", "--binary", "HEAD"], cwd=worktree,
+            check=True, capture_output=True,
+        ).stdout
+        approval_data = {
+            "task_id": "TASK-TEST", "contract_sha256": d.digest(self.task),
+            "result": "APPROVED", "approved_by": "human",
+            "evidence": "reuse exact scoped tracked partial after process exit",
+        }
+        d.atomic(approval, yaml.safe_dump(approval_data))
+        with self.assertRaisesRegex(ValueError, "bind previous/current contracts"):
+            d.prepare(
+                self.root, "TASK-TEST", True, approval,
+                reuse_tracked_worktree=True, previous_process_exited=True,
+            )
+        approval_data.update(
+            previous_contract_sha256=first["contract_sha256"],
+            candidate_diff_sha256=hashlib.sha256(candidate_diff).hexdigest(),
+        )
+        d.atomic(approval, yaml.safe_dump(approval_data))
+        with contextlib.redirect_stdout(io.StringIO()):
+            second = d.prepare(
+                self.root, "TASK-TEST", True, approval,
+                reuse_tracked_worktree=True, previous_process_exited=True,
+            )
+        self.assertEqual(Path(second["worktree"]), worktree)
+        self.assertEqual(second["reused_terminal_worktree"]["candidate_kind"], "tracked")
+        self.assertEqual((worktree / "src/result.txt").read_text(encoding="utf-8"), "partial\n")
+
+    def test_reuse_tracked_worktree_rejects_untracked_candidate(self):
+        self.task["scope"]["writable"] = ["src/new.txt"]
+        self.write_task(); self.commit()
+        first = self.prepare(); worktree = Path(first["worktree"])
+        candidate = worktree / "src/new.txt"
+        candidate.parent.mkdir(parents=True); candidate.write_text("untracked\n", encoding="utf-8")
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8")); failed["phase"] = "LAUNCH_FAILED"; d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task.update(contract_revision=2, attempt=2)
+        self.task["isolation"]["reuse_tracked_worktree"] = True
+        self.write_task(); self.commit()
+        with self.assertRaisesRegex(ValueError, "already-tracked"):
+            d.prepare(
+                self.root, "TASK-TEST", True, self.approval("tracked-untracked.yaml"),
+                reuse_tracked_worktree=True, previous_process_exited=True,
+            )
+
+    def test_incremental_rework_context_prioritizes_previous_review(self):
+        self.write_task(); self.commit()
+        first = self.prepare()
+        run_one = Path(first["run_dir"]) / "run.json"
+        failed = json.loads(run_one.read_text(encoding="utf-8")); failed["phase"] = "LAUNCH_FAILED"; d.save(run_one, failed)
+        with contextlib.redirect_stdout(io.StringIO()):
+            d.ai.transition(self.root, "TASK-TEST", "BLOCKED")
+            d.ai.transition(self.root, "TASK-TEST", "READY")
+        self.folder = self.root / ".ai/tasks/queue/TASK-TEST"
+        self.task = d.read_yaml(self.folder / "task.yaml")
+        self.task.update(contract_revision=2, attempt=2)
+        self.task["execution"]["context_budget"] = "incremental"
+        review = self.folder / "history/attempt-1/review.yaml"
+        review.parent.mkdir(parents=True)
+        review.write_text("verdict: REWORK\nfindings:\n- issue: exact failure\n", encoding="utf-8")
+        self.write_task(); self.commit()
+        with contextlib.redirect_stdout(io.StringIO()):
+            second = d.prepare(self.root, "TASK-TEST", True)
+        context = (Path(second["run_dir"]) / "context.md").read_text(encoding="utf-8")
+        self.assertIn("rework-delta.yaml", context)
+        self.assertIn("exact failure", context)
+        self.assertNotIn("## context.md", context)
 
     def test_reuse_terminal_worktree_rejects_manifest_drift(self):
         self.task["scope"]["writable"] = ["src/result.txt"]

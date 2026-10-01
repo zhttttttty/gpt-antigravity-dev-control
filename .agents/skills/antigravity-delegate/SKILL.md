@@ -33,11 +33,11 @@ Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供�
 [调用提示词](references/invocation-prompts.md)。
 使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
 默认 Sol high 作为唯一规划与最终决策主控，Luna high 负责有界只读探索、独立测试与
-审查，Antigravity 作为有界任务的默认实现后端。原生 Luna worker 只在 agy 不可用且
+审查，Antigravity 只作为机械、边界清晰且可确定验收任务的实现后端。原生 Luna worker 只在 agy 不可用且
 Root 明确记录原因并批准切换后端时作为回退。
 用户或运行时的明确选择优先，报告实际使用情况。
 
-小型低风险修改可由 Root 直接执行；边界明确、可由命令验收的多文件实现默认使用本地 agy。
+小型低风险修改可由 Root 直接执行；边界明确、判断强度低且可由命令验收的独立实现可使用本地 agy。
 高判断力审查、正确性证明、微妙语言语义与安全结论默认交给 Sol/Luna；agy 可做首轮扫描，
 但其 PASS 不能成为最终结论。把机械实现、补测试、样板代码和独立重构优先交给 agy，
 把契约、反例设计、独立审查和最终裁决留给原生角色。
@@ -54,12 +54,18 @@ Luna 的调查与审查输出是证据和建议，不能代替 Sol 的任务契�
 
 Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
 
-- `direct`：小型修改、简短文档或配置、正确性/安全审查、微妙运行时语义，或需要持续交互推理的工作；原生 worker
+- `direct`：小型修改、简短文档或配置、正确性/安全审查、微妙运行时语义、高上下文连续性，或需要持续交互推理的工作；原生 worker
   仅作为明确批准的故障回退，不能静默替代 agy。
-- `delegated`：有界多文件实现、补充测试、独立重构或可通过确定性命令验收的批量工作。
+- `delegated`：机械且有界的多文件实现、补充测试、独立重构或可通过确定性命令验收的批量工作。
 - `approval_required`：架构、认证、安全、迁移、部署、计费、破坏性或其他高风险工作。
 - 探测失败时先停止派发并诊断；若用户指定 Antigravity，不得以成本或超时为由静默
   切换 Codex 编码。小型低风险任务可按已授权范围直接处理。
+
+新契约用 `planning.work_type`、`judgment`、`context_continuity` 和
+`acceptance_determinism` 辅助路由。semantic/security/architecture、高判断、强连续性或
+低确定性验收默认 direct；强制委派必须声明结构化 `routing_override`，并在 prepare 时
+提供绑定当前契约哈希的独立 approval artifact，契约内自填字段不算审批。
+旧 schema-v2 任务缺少这些字段时保持原有显式 mode 行为。
 
 自动选择 Skill 本身仅授权规划与只读探测。变更、权限绕过或受控执行前，落实任务
 要求的审批；已有明确用户授权按当前会话范围适用。
@@ -89,14 +95,20 @@ Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
    独立写入使用独立 Worktree；先串行 prepare，再按剩余容量并行编码，最后串行 collect。
    不要并行运行持同仓锁的 control.py launch。启动器重试仍须计入已批准任务预算，
    无剩余预算时 max_retries 为 0；首次失败后降为单并发。
-4. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
+4. 实现者提交代码并将回执标记为 `IMPLEMENTED` 后，运行
+   `control.py verify TASK-ID --approve --approval-file PATH`。approval 必须绑定当前契约哈希
+   和其中的确切验证矩阵；Worktree 不是操作系统沙箱。
+   控制器按 adversarial probes、fast gate、final gate 顺序运行契约命令，填充真实命令、
+   工作区和范围证据；任一前置 gate 失败即停止后续 gate。仅使用旧 `checks.required`
+   的兼容契约可直接 collect 旧 COMPLETE 回执；包含 staged gate 的契约必须先 VERIFIED。
+5. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
    多分片先运行 `collect_reports.ps1`；单任务读 run.json 和原始回执。
    启动器 COMPLETE/exit 0 只证明进程结束，不证明任务验收；空 stdout、权限自动拒绝、
    缺少回执或格式不符均不得计为成功。
-5. agy 完全退出后再串行启动 Luna tester/reviewer；独立核验全部 P0/P1 的路径行号、
+6. agy 完全退出后再串行启动 Luna tester/reviewer；独立核验全部 P0/P1 的路径行号、
    测试、验收和覆盖计数及 Worktree 状态，
    将发现标记为确认、条件成立或假设。收集不会自动合并或迁入 DONE。
-6. 使用 `cleanup_worktree.ps1` 清理；只有干净 Worktree 可移除，强制清理需明确批准。
+7. 使用 `cleanup_worktree.ps1` 清理；只有干净 Worktree 可移除，强制清理需明确批准。
 
 ## 仓库入口
 
@@ -118,7 +130,7 @@ DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
 实际模型和角色以运行证据为准，不能由 TOML 推断。保留 Skill 名称，兼容
 `$antigravity-delegate` 调用。
 
-成本比较必须包含失败尝试、编排和独立审查；CLI 输出字节不是 Token。Provider 未返回
+成本比较按[成本测量](references/cost-metrics.md)包含失败尝试、编排和独立审查；CLI 输出字节不是 Token。Provider 未返回
 用量时保持 UNKNOWN，只能把账号额度百分比作为受其他会话干扰的粗粒度观测，不能宣称
 精确节省比例。优先以“通过独立审查的任务/返工次数/总耗时”比较后端，而非只看首个 exit 0。
 

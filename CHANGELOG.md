@@ -1,5 +1,18 @@
 # 变更记录
 
+## 3.4.0-local - 2026-10-01
+
+- 新增判断强度、工作类型、上下文连续性和验收确定性路由；高语义、安全、架构与强连续性
+  任务默认 direct，只有结构化 override 加独立 contract-bound approval 才允许委派。
+- 将检查分成 adversarial probes、fast gate 和 final gate，并保留 `checks.required` 向后兼容。
+- 新增 `control.py verify`，由控制器在模型退出后运行契约命令并填充真实命令、工作区和范围证据；
+  Antigravity 只需提交实现并写 IMPLEMENTED 回执。验证默认不用 shell，要求独立契约审批、
+  单命令/总超时、进程树清理和逐命令 Worktree 复核。
+- 将 implementation rework 与 infra retry 预算分离，新增 incremental rework context。
+- 新增经审批的 tracked partial Worktree 恢复路径；审批绑定旧/新契约和 binary diff，拒绝
+  未跟踪候选，仍禁止 Root 搬运或代提交半成品。
+- 修复失效文档链接，增加 Skill 内成本测量说明，并更新默认调用提示词以避免“凡编码必委派”。
+
 ## 3.3.0-local - 2026-09-15
 
 - 将 Plus 项目默认值调整为 Sol high 唯一规划/最终决策主控、Luna high 探索/测试/审查，

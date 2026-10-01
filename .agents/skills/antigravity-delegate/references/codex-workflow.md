@@ -5,7 +5,7 @@
 [编排规则](orchestration.md)。
 
 生命周期命令均针对主控仓库。原生/direct 使用 `start`，
-本地 agy 使用 `prepare/launch/collect`。仅 Root 推进状态；
+本地 agy 使用 `prepare/launch/verify/collect`。仅 Root 推进状态；
 Worktree 的任务目录是契约快照，不是活动状态。
 
 新任务使用 `control.py create`，补齐范围、验收和检查后验证。

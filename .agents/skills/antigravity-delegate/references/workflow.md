@@ -34,9 +34,11 @@ start --worktree、worktree-create 和 prepare 前提交完整契约及预期修
     python .agents/skills/antigravity-delegate/scripts/control.py start TASK-001 --worktree
     python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
     python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+    python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
     python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
-Executor 只能修改可写范围，运行必要检查并写回执，不得自我批准或合并。
+Executor 只能修改可写范围，运行编码所需的 focused checks，提交实现并写 IMPLEMENTED
+回执，不得自我批准或合并。控制器 verify 运行权威检查矩阵并补充命令/工作区证据。
 Print 模式命令工作流优先采用有界同步执行，在 Windows 上搜索使用工作区 cwd 相对路径避免绝对盘符路径解析异常；
 异步/后台命令必须使用实际返回句柄进行主动轮询（TaskId 通过 manage_task status 轮询至 DONE/FAILED，
 CommandId 通过 command_status 轮询），严禁被动文本叙述等待、wait 定时器或 schedule 替代。
@@ -48,7 +50,7 @@ CommandId 通过 command_status 轮询），严禁被动文本叙述等待、wai
 Luna worker 不得作为 delegated 的中转或默认实现者；agy 不可用时，Root 必须先记录
 原因并批准切换为 direct，才能派发原生实现。
 Root 显式检查范围与证据后迁入 REVIEW，不对原生任务运行 agy 的 collect。
-合计并发和版本交接见 [混合执行](HYBRID_ORCHESTRATION.md)。
+合计并发和版本交接见 [混合执行](orchestration.md)。
 
 两条路径的活动状态都归主控仓库。生命周期命令在主控运行，也可指定
 `control.py --repo <主控路径>`；Worktree 内任务文件只是已提交快照。

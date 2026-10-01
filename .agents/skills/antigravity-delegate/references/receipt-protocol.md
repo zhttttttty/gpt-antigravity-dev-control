@@ -32,6 +32,12 @@ DONE 要求 known_issues_review 一对一原文映射、evidence_checked，以�
 或纯字符串批准；QA/Review 须一致 PASS_WITH_NOTES，既有人工合并门保持有效。
 
 执行者在上下文或启动提示词指定的绝对路径写核心协议回执，只提交实现，不修改任务状态。
+新流程由执行者填写身份、验收、偏差和问题并设置 `IMPLEMENTED`；控制器
+`verify --approve --approval-file PATH`
+执行 task.yaml 中的精确命令，填充 commands、workspace、changed_files、scope_check，并将
+状态改为 COMPLETE 或 FAILED。控制器不得替执行者编造验收声明，也不得把 FAILED
+执行结果升级为 COMPLETE。仅含旧 `checks.required`、不含 staged gate 的兼容契约可直接
+collect 旧执行者写出的完整 COMPLETE 回执；新 staged-contract 必须经过 VERIFIED。
 主控拥有状态迁移权限，执行分支上的任务副本为历史契约，不是第二个活动队列。
 
 本地 agy 的 `collect` 核验身份、版本和声明的必要证据，观测 Git 变更与保护范围，

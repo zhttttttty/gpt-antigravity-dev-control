@@ -2,7 +2,8 @@
 
 [English](README.md)
 
-统一流程：**Sol high 决策与计划 → Luna high 探索/核验 → 本地 Antigravity 实现 →
+风险自适应流程：**Sol high 决策与计划 → Luna high 探索/独立审查 →
+本地 Antigravity 处理边界明确的机械实现 → 控制器执行确定性验证 →
 Sol 最终验收 → 人工合并**。
 
 项目只有一套任务协议和一个主要命令入口，通过 `execution.mode` 选择直接执行、本地委派或审批后委派。
@@ -32,8 +33,14 @@ execution:
   adapter: antigravity_cli
   context_budget: compact
   report_level: summary
-  max_execution_attempts: 2
+  max_implementation_reworks: 1
+  max_infra_retries: 1
   escalation: codex_review
+planning:
+  work_type: mechanical
+  judgment: low
+  context_continuity: low
+  acceptance_determinism: high
 ```
 
 | 模式 | 用途 |
@@ -51,6 +58,7 @@ python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
 python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --executable "$env:LOCALAPPDATA\agy\bin\agy.exe"
+python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
 python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ```
 
@@ -59,9 +67,9 @@ python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ## 在 Codex 中使用
 
 仓库提供 Plus 项目级配置：Sol high 是唯一规划、架构和最终验收主控，Luna high
-负责有界只读探索、独立测试与审查，本地 Antigravity 是 delegated/approval_required
-的默认实现者。原生 Luna worker 仅在 agy 不可用或不适用、Root 记录原因并明确批准
-切换为 direct 后作为回退。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
+负责有界只读探索与独立审查，本地 Antigravity 处理低判断、验收确定的机械任务。
+语义、安全、架构、强上下文连续性或验收不确定的任务默认走 direct；只有结构化批准
+才能覆盖该路由。原生线程上限为两个，跨原生/agy 的合计预算由 Root 协调。
 详见 [混合执行指南](.agents/skills/antigravity-delegate/references/orchestration.md)。
 
 使用 Python 3.11+ 执行 `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` 可检查
@@ -87,9 +95,10 @@ Codex 任务中调用 $antigravity-delegate，Codex 会负责规划、命令执�
 在隔离 Worktree 中完成，并返回测试结果和回执路径。
 ```
 
-默认角色分工是：Luna explorer 先提供代码路径与风险证据，Sol 据此创建任务契约；
-agy 作为唯一写入者实现并退出后，Luna tester/reviewer 串行核验同一快照，最后由 Sol
-复核 Diff、测试和回执并决定 PASS、REWORK 或 BLOCKED。任何代理都不会自动合并。
+委派任务的角色分工是：按需由 Luna explorer 提供代码路径与风险证据，Sol 据此创建
+任务契约；agy 作为唯一写入者实现并把回执标为 `IMPLEMENTED`。agy 完全退出后，控制器
+依次执行 probe/fast/final gate，Luna 再独立审查同一快照，最后由 Sol 决定 PASS、
+REWORK 或 BLOCKED。任何代理都不会自动合并。
 
 在目标 Git 项目中，也可以直接运行控制器。首次接入只需初始化最小运行状态：
 
@@ -112,11 +121,13 @@ python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
 python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
 python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 ```
 
-`route` 返回 `direct`、`delegated` 或 `approval_required`。高风险任务必须先完成审批；
+`route` 同时返回所选模式与实际后端：风险决定是否审批，判断强度和验收确定性决定后端。
+高风险任务必须先完成审批；
 `collect` 成功只表示进入待审查状态，不会自动合并或宣布任务完成。执行前可用
 `control.py probe --executable <agy路径>` 检查本机 `agy` 是否可用。
 
@@ -133,7 +144,7 @@ python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 
 1. `.ai/` 与 Git 是长期事实源。
 2. `task.yaml` 同时定义范围、权限、风险、路由和验收条件。
-3. Executor 完成不等于 Reviewer 验收通过。
+3. Executor 的 `IMPLEMENTED` 不等于控制器验证 `COMPLETE`，两者也不等于 Reviewer PASS。
 4. 缺失证据按失败关闭处理；REWORK 保留旧证据。
 5. 完整日志留在本地，默认先读取精简回执。
 6. 控制器不会自动合并，也不会自行宣布任务 DONE。
@@ -153,6 +164,6 @@ python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 - [执行模式](.agents/skills/antigravity-delegate/references/orchestration.md)
 - [架构](.agents/skills/antigravity-delegate/references/workflow.md)
 - [当前限制](.agents/skills/antigravity-delegate/references/delegation.md)
-- [用量测量](COST_METRICS.md)
+- [用量测量](.agents/skills/antigravity-delegate/references/cost-metrics.md)
 
-当前版本：**3.3.0-local**。
+当前版本：**3.4.0-local**。

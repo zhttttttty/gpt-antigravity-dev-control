@@ -18,6 +18,11 @@ Windows npm EBUSY 先记录失败及锁定状态，优先新干净 Worktree，�
 
 ## BLOCKED 的有界返工
 
+新契约用 `max_implementation_reworks` 约束语义返工，用 `max_infra_retries` 约束同一实现
+attempt 内的启动/认证/Provider 恢复。旧 `max_execution_attempts` 继续表示总实现次数。
+权限、空输出和传输失败先分类并消耗 infra budget；只有生成候选后被独立审查退回才消耗
+implementation rework。两类预算都不得无限增长。
+
 预算耗尽是计划复核点，不自动等于需要再次请求用户授权。若用户已明确授权修通
 同一范围的路由/功能，Sol 可记录新证据、缩小任务并修订自定尝试预算，重新绑定
 当前授权与新契约哈希；须公开说明调整，保留历史且不扩大权限。用户明确规定的硬
@@ -26,7 +31,8 @@ max1、失败、询问，形成流程死循环；也不得用“跑通”为名�
 
 先落实新增尝试/修订的授权依据（有效既有授权或新授权），保留旧 Worktree、原始执行回执和完整日志。
 当前 BLOCKED→READY 不自动归档、增加 attempt 或重置回执；只有 REVIEW→READY
-具备该行为。Root 须先保存 history/attempt-N，更新 revision/attempt/max_execution_attempts
+具备该行为。Root 须先保存 history/attempt-N，更新 revision/attempt 和
+`max_implementation_reworks`（旧契约才更新 `max_execution_attempts`）
 并重置当前模板身份，再绑定新契约哈希审批；不得删除 run-* 来重置预算。
 修复已有代码时从对应执行提交建立专用返工基线，而不是从缺少代码的主控 HEAD 开始。
 仅在核对纯治理 Diff 后转入所需治理状态，不互相混合实现，也不自动合入 main。
@@ -45,6 +51,13 @@ Root 必须先按 PID/进程树证据确认旧执行器已退出；确认 flag �
 完全相等的情况，并在重命名前再次核验。旧 base 必须是当前治理基线的祖先。
 它保留目录和文件，重命名为新 attempt 分支，写入新的 context/receipt，
 并把原 base_commit 写入新 run。任一检查失败即停止；不得退化为新 Worktree 搬运候选。
+
+若留下的是 tracked/staged partial，可在新契约设置 `isolation.reuse_tracked_worktree: true`
+并使用 `--reuse-tracked-worktree --confirm-previous-process-exited`。该路径额外要求当前契约的
+结构化 approval；approval 必须同时绑定旧 contract hash、候选 binary diff hash 和当前
+contract hash。只接受同一受管 Worktree、HEAD 仍等于旧 base、无未跟踪文件、
+无删除/重命名/冲突，且全部 tracked added/modified 路径属于无 glob 的精确 writable 清单。新 attempt 必须重新运行
+所有受影响 probes、verify 和独立审查。Root 仍不得复制、stash/apply 或代提交半成品。
 
 ## 本地 agy
 

@@ -13,8 +13,9 @@
 
 【在这里写需求、目标仓库和验收条件】
 
-先由 Luna 只读探索，Sol 制定任务契约和路由；需要编码时交给 Antigravity；
-Antigravity 完全退出后由 Luna 独立审查，最后由 Sol 给出 PASS、REWORK 或 BLOCKED。
+边界不清时先由 Luna 只读探索，Sol 根据判断强度、连续上下文需求和验收确定性制定契约并路由；
+只有机械、边界清晰、可确定验收的实现交给 Antigravity，高语义/安全/架构任务保持 direct；
+实现者完全退出后由 Luna 按风险独立审查，最后由 Sol 给出 PASS、REWORK 或 BLOCKED。
 不要自动合并。
 ```
 
@@ -29,14 +30,16 @@ Antigravity 完全退出后由 Luna 独立审查，最后由 Sol 给出 PASS、R
 限制：【不能修改的文件、兼容性、时间或安全要求】
 
 按默认流程执行：
-1. Luna high 只读探索代码、定位影响范围、风险和可运行的验证命令。
+1. 仅在边界不清或缺少证据时由 Luna high 只读探索；已有充分证据时复用，不重复扫描。
 2. Sol high 根据证据作出决策，创建有界任务契约，并选择 direct、delegated 或
    approval_required。
-3. 若为 delegated，在独立 Worktree 中交给 Antigravity 实现；不得静默改用原生
+3. 若为 delegated，在独立 Worktree 中交给 Antigravity 实现；semantic/security/
+   architecture、高判断、强连续性或低确定性验收默认 direct；不得静默改用原生
    Luna worker。
-4. Antigravity 完全退出后，Luna high 针对同一快照独立测试和审查。
-5. Sol high 核对契约、差异和证据，最终给出 PASS、REWORK 或 BLOCKED。
-6. 不要自动合并；报告任务 ID、实际路由、提交、测试结果和剩余风险。
+4. Antigravity 提交实现并写 IMPLEMENTED 回执后，由控制器 verify 依次运行反例、快速和全量 gate。
+5. Antigravity 完全退出后，Luna high 针对同一快照独立测试和审查。
+6. Sol high 核对契约、差异和证据，最终给出 PASS、REWORK 或 BLOCKED。
+7. 不要自动合并；报告任务 ID、实际路由、提交、测试结果和剩余风险。
 ```
 
 一次调用的好处是 Task ID、基线、Worktree 和验收条件由同一个主控连续维护。除非需要
@@ -97,7 +100,7 @@ Antigravity 实现完成后的审查提示词：
 ```text
 使用 $antigravity-delegate，执行已经 READY 的 TASK-ID【任务 ID】。
 
-先验证任务契约和 agy 能力，再按 prepare -> launch -> collect 流程让 Antigravity 在
+先验证任务契约和 agy 能力，再按 prepare -> launch -> verify -> collect 流程让 Antigravity 在
 指定独立 Worktree 中实现。严格遵守文件范围、验收条件和禁止事项；保存提交、测试、
 日志和回执证据。不得静默切换到原生 Luna worker，也不要自动合并。
 
@@ -112,7 +115,8 @@ Worktree 为准；不要只凭聊天摘要猜测当前快照。
 | 情况 | 推荐路由 | 调用方式 |
 | --- | --- | --- |
 | 修改 1 个文件、低风险、预计 10 分钟以内 | `direct` | 使用短提示词并补充“若探测确认仍是小改，由 Sol 直接完成” |
-| 修改多个文件、有明确测试 | `delegated` | 使用“一次调用完整流程”或已有契约的 Antigravity 执行提示词 |
+| 机械多文件修改、验收确定 | `delegated` | 使用“一次调用完整流程”或已有契约的 Antigravity 执行提示词 |
+| 语义、安全、架构或连续阶段开发 | `direct` | 保持 Codex 连续上下文；完成后仍做独立审查 |
 | 边界不明确 | 先探索 | 先用 Luna 只读探索提示词，再让 Sol 决定路由 |
 | 架构、安全、迁移、部署 | `approval_required` | 使用高风险模板，在启动执行前等待人工批准 |
 | Antigravity 已完成 | Luna reviewer | 使用 Luna 独立审查提示词，随后交给 Sol 最终验收 |

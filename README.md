@@ -2,10 +2,11 @@
 
 [中文说明](README.zh-CN.md)
 
-A local-first AI development control plane: **Sol high decides and plans;
-Luna high explores and verifies; Antigravity / Gemini implements bounded tasks
-in Git worktrees; Sol makes the final acceptance decision; humans approve
-high-risk work and merge**.
+A local-first, risk-adaptive AI development control plane: **Sol high decides and
+plans; Luna high explores and reviews; Antigravity / Gemini implements bounded,
+mechanical tasks in Git worktrees; deterministic checks run outside the model
+session; Sol makes the final acceptance decision; humans approve high-risk work
+and merge**.
 
 There is one task protocol and one primary CLI. Per-task `execution.mode` selects
 direct implementation, local delegation, or approval-required delegation.
@@ -35,8 +36,14 @@ execution:
   adapter: antigravity_cli
   context_budget: compact
   report_level: summary
-  max_execution_attempts: 2
+  max_implementation_reworks: 1
+  max_infra_retries: 1
   escalation: codex_review
+planning:
+  work_type: mechanical
+  judgment: low
+  context_continuity: low
+  acceptance_determinism: high
 ```
 
 ```sh
@@ -44,6 +51,7 @@ python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
 python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
 python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ```
 
@@ -53,11 +61,10 @@ new usage should use control.py.
 ## Use it inside Codex
 
 The project Plus profile uses Sol high as the sole planning, architecture, and
-final-acceptance authority; Luna high for bounded read-only exploration,
-independent testing, and review; and local Antigravity as the default implementation
-backend for delegated and approval-required tasks. A native Luna worker is an
-explicit fallback only after the root records why agy is unavailable or unsuitable
-and approves a route change to direct. Native threads are capped at two; the
+final-acceptance authority; Luna high for bounded read-only exploration and
+independent review; and local Antigravity for low-judgment, deterministic tasks.
+Semantic, security, architecture, continuity-sensitive, or weakly specified work
+routes to direct Codex unless a structured override is approved. Native threads are capped at two; the
 combined native/agy budget is root-coordinated, not a shared runtime lock. See
 [Hybrid Orchestration](.agents/skills/antigravity-delegate/references/orchestration.md).
 
@@ -86,10 +93,11 @@ Use $antigravity-delegate, delegate the implementation to Antigravity,
 work in an isolated Git worktree, and return the test results and receipt path.
 ```
 
-The default handoff is sequential: a Luna explorer returns repository evidence;
-Sol creates the task contract; agy implements as the only writer; after agy exits,
-Luna tester/reviewer agents verify the same snapshot; Sol then reviews the diff,
-tests, and receipts and decides PASS, REWORK, or BLOCKED. No agent merges automatically.
+For delegated work the handoff is sequential: optional Luna exploration returns
+repository evidence; Sol creates the task contract; agy implements as the only
+writer and marks the receipt `IMPLEMENTED`; after agy exits, the controller runs
+the exact probe/fast/final gates and Luna independently reviews the same snapshot.
+Sol then decides PASS, REWORK, or BLOCKED. No agent merges automatically.
 
 For a standalone Git project, initialize the minimal runtime state and probe the
 local executable first:
@@ -113,12 +121,14 @@ python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
 python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
 python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
 ```
 
-`route` returns `direct`, `delegated`, or `approval_required`. High-risk work
-must pass its approval gate first. A successful `collect` moves the task to
+`route` reports the selected mode plus the effective backend. Risk controls the
+approval gate; judgment and determinism control the backend. High-risk work must
+pass its approval gate first. A successful `collect` moves the task to
 review; it does not merge changes or declare the task complete. If `agy` is not
 on `PATH`, run `probe --executable <path-to-agy>`.
 
@@ -137,10 +147,11 @@ flowchart TD
     H[Human intent] --> L[Luna high\nRead-only exploration]
     L --> C[Sol high\nPlan / Architecture]
     C --> T[Core Protocol\ntask.yaml + Risk Gates]
-    T --> R{execution.mode}
-    R -->|direct| D[Direct implementation]
-    R -->|delegated| A[Local agy + Git Worktree]
-    R -->|approval_required| X[Human Approval]
+    T --> R{Adaptive route}
+    R -->|high judgment / continuity| D[Direct implementation]
+    R -->|bounded + deterministic| A[Local agy + Git Worktree]
+    R -->|high risk| X[Human Approval Gate]
+    X --> D
     X --> A
     D --> E[Receipt + Evidence]
     A --> E
@@ -156,7 +167,7 @@ flowchart TD
 |---|---|---|
 | `direct` | Root/manual work or bounded native Codex tasks | Root, human or native worker implements; root checks evidence |
 | `delegated` | Bounded multi-file implementation, tests, or refactors | Local agy implements in an isolated worktree |
-| `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then local delegation |
+| `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then the adaptively selected backend |
 
 All modes share the same state machine, receipts, evidence rules, review gate,
 and human merge authority. See [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md).
@@ -176,7 +187,7 @@ administrator rights or disable scope, receipt, review, and merge gates.
 
 - `.ai/` and Git are durable project truth.
 - `task.yaml` defines scope, authority, risk, routing, and acceptance criteria.
-- Executor `COMPLETE` is not reviewer `PASS`.
+- Executor `IMPLEMENTED` is not controller verification `COMPLETE`, and neither is reviewer `PASS`.
 - Delegated and medium/high-risk implementation uses isolated Git worktrees.
 - Missing evidence fails closed; REWORK preserves earlier attempt evidence.
 - Full logs remain local and compact receipts are reviewed first.
@@ -197,12 +208,12 @@ administrator rights or disable scope, receipt, review, and merge gates.
 - [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md)
 - [Architecture](.agents/skills/antigravity-delegate/references/workflow.md)
 - [Current Limitations](.agents/skills/antigravity-delegate/references/delegation.md)
-- [Cost Measurement](COST_METRICS.md)
+- [Cost Measurement](.agents/skills/antigravity-delegate/references/cost-metrics.md)
 - [Risk Gates](.agents/skills/antigravity-delegate/references/workflow.md)
 
 ## Status
 
-Current version: **3.3.0-local**. The project is a local control workflow; no
+Current version: **3.4.0-local**. The project is a local control workflow; no
 remote scheduler, reviewer API, or fixed token-savings claim is required.
 
 ## License

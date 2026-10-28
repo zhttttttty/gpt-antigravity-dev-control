@@ -332,12 +332,32 @@ try {
                     try { $job.process.Kill($true) } catch { try { $job.process.Kill() } catch {} }
                 }
                 $job.process.WaitForExit()
-                $stdout = $job.stdout_task.GetAwaiter().GetResult()
-                $stderr = $job.stderr_task.GetAwaiter().GetResult()
+                    $stdout = $job.stdout_task.GetAwaiter().GetResult()
+                    $stderr = $job.stderr_task.GetAwaiter().GetResult()
                 Set-Content -LiteralPath $job.report -Value $stdout -Encoding UTF8
                 Set-Content -LiteralPath $job.record.report -Value $stdout -Encoding UTF8
                 Set-Content -LiteralPath $job.error_log -Value $stderr -Encoding UTF8
-                $attemptStatus = if ($timedOut) { "timed_out" } elseif ($job.process.ExitCode -eq 0) { "completed" } else { "failed" }
+                $combinedOutput = ($stdout + [Environment]::NewLine + $stderr).ToLowerInvariant()
+                $permissionBlocked = (
+                    $combinedOutput.Contains("soft-denying tool confirmation") -or
+                    $combinedOutput.Contains("headless mode cannot prompt") -or
+                    $combinedOutput.Contains("permission that headless mode cannot prompt for") -or
+                    $combinedOutput.Contains("auto-denied") -or
+                    $combinedOutput.Contains("add an allow-rule under permissions.allow")
+                )
+                $emptyOutput = [string]::IsNullOrWhiteSpace($stdout)
+                $reportedNoOutput = $combinedOutput.Contains("no output produced")
+                $attemptStatus = if ($timedOut) {
+                    "timed_out"
+                } elseif ($permissionBlocked) {
+                    "permission_blocked"
+                } elseif ($job.process.ExitCode -eq 0 -and ($emptyOutput -or $reportedNoOutput)) {
+                    "empty_output"
+                } elseif ($job.process.ExitCode -eq 0) {
+                    "completed"
+                } else {
+                    "failed"
+                }
                 $attemptRecord = [pscustomobject][ordered]@{
                     attempt = $job.record.attempt
                     session_id = [string]$job.process.Id
@@ -348,6 +368,9 @@ try {
                     error_log = $job.error_log
                     started_utc = $job.record.started_utc
                     completed_utc = [DateTime]::UtcNow.ToString("o")
+                    elapsed_seconds = [Math]::Round(([DateTime]::UtcNow - $job.started_utc).TotalSeconds, 3)
+                    stdout_bytes = [Text.Encoding]::UTF8.GetByteCount($stdout)
+                    stderr_bytes = [Text.Encoding]::UTF8.GetByteCount($stderr)
                 }
                 $job.record.attempts += $attemptRecord
                 $job.record.completed_utc = $attemptRecord.completed_utc
@@ -359,7 +382,7 @@ try {
                         $registry.ramp_up_pending = $false
                         $registry.ramp_up_completed = $true
                     }
-                } elseif ($job.record.attempt -lt $job.record.max_attempts) {
+                } elseif ($attemptStatus -ne "permission_blocked" -and $job.record.attempt -lt $job.record.max_attempts) {
                     $job.record.status = "queued"
                     $job.record.failure_reason = $attemptStatus
                     $job.record.attempt = [int]$job.record.attempt + 1

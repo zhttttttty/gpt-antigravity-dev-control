@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -29,8 +31,10 @@ jobs:
           PY
       - name: CLI smoke checks
         run: |
+          python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration
           python .agents/skills/antigravity-delegate/scripts/control.py --repo tests/fixtures/control-project check-orchestration
-          python .agents/skills/antigravity-delegate/scripts/control.py --repo tests/fixtures/control-project status
+          python .agents/skills/antigravity-delegate/scripts/control.py status --json
+          python .agents/skills/antigravity-delegate/scripts/control.py run "CLI smoke preview" --allow README.md --dry-run
           python .agents/skills/antigravity-delegate/scripts/control.py --help
       - name: Local delegation regression tests (no provider calls)
         run: python -m unittest discover -s tests -v
@@ -39,6 +43,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Parse PowerShell protocol scripts
         shell: powershell
         run: |

@@ -49,5 +49,14 @@ human_approval:
 
 blocking_findings: []
 non_blocking_findings: []
+known_issues_review: []
+# - issue: minor warning in test helper
+#   disposition: ACCEPTED_RESIDUAL
+#   evidence_checked: inspected helper and verified non-blocking
+#   risk_owner_approval:
+#     approved_by: gpt-5.6-sol
+#     result: APPROVED
+#     evidence: ADR-001
+
 verdict: null
 # PASS | PASS_WITH_NOTES | REWORK | BLOCKED

@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from task_data import (read_yaml, write_yaml, parse_yaml, task_id as checked_id,
-                       done_errors, require_approval)
+from task_data import (CHECK_STAGES, implementation_attempt_limit, read_yaml,
+                       write_yaml, parse_yaml, task_id as checked_id,
+                       done_errors, require_approval, required_check_items, route_task)
 
 STATES = {
     "READY": ".ai/tasks/queue",
@@ -28,6 +30,9 @@ ALLOWED = {
     "ARCHIVED": set(),
 }
 RISK = {"low", "medium", "high"}
+WORK_TYPES = {"mechanical", "semantic", "security", "architecture"}
+JUDGMENT = {"low", "medium", "high"}
+LEVEL = {"low", "high"}
 
 
 def template_dir(root):
@@ -147,6 +152,16 @@ def validate_task(root, task_id, quiet=False):
             errors.append(f"folder/status mismatch: folder={folder_state}, task.yaml={status}")
         if not isinstance(risk, str) or risk not in RISK:
             errors.append(f"invalid/missing planning.risk: {risk}")
+        optional_planning = {
+            "work_type": WORK_TYPES,
+            "judgment": JUDGMENT,
+            "context_continuity": LEVEL,
+            "acceptance_determinism": LEVEL,
+        }
+        for key, allowed in optional_planning.items():
+            value = data["planning"].get(key)
+            if value is not None and value not in allowed:
+                errors.append(f"invalid planning.{key}: {value}")
         if risk in ("medium", "high") and worktree is not True:
             errors.append(f"{risk} risk requires isolation.worktree: true")
         for key in ["planner", "executor", "reviewer"]:
@@ -160,10 +175,15 @@ def validate_task(root, task_id, quiet=False):
             errors.append("acceptance requires AC-* items with criterion/evidence")
         elif len({item["id"] for item in acceptance}) != len(acceptance):
             errors.append("acceptance IDs must be unique")
-        required = data["checks"].get("required")
-        if not isinstance(required, list) or not all(isinstance(item, dict) and
-                isinstance(item.get("command"), str) and item["command"].strip() for item in required):
-            errors.append("checks.required must contain command mappings")
+        for check_group in (*CHECK_STAGES, "required", "optional"):
+            items = data["checks"].get(check_group, [])
+            if not isinstance(items, list) or not all(isinstance(item, dict) and
+                    isinstance(item.get("command"), str) and item["command"].strip() for item in items):
+                errors.append(f"checks.{check_group} must contain command mappings")
+            elif any("shell" in item and type(item["shell"]) is not bool for item in items):
+                errors.append(f"checks.{check_group} shell must be boolean")
+        if not required_check_items(data):
+            errors.append("checks requires at least one adversarial, fast, final, or legacy required command")
         for section in ("authority", "risk_controls"):
             if any(type(value) is not bool for value in data[section].values()):
                 errors.append(f"{section} values must be booleans")
@@ -172,6 +192,23 @@ def validate_task(root, task_id, quiet=False):
         execution = data.get("execution", {})
         if not isinstance(execution, dict) or execution.get("mode", "direct") not in ("direct", "delegated", "approval_required"):
             errors.append("invalid execution.mode")
+        elif isinstance(execution, dict):
+            try:
+                implementation_attempt_limit(execution)
+            except ValueError as exc:
+                errors.append(str(exc))
+            infra = execution.get("max_infra_retries", 1)
+            if type(infra) is not int or not 0 <= infra <= 3:
+                errors.append("max_infra_retries must be 0..3")
+            if execution.get("context_budget", "compact") not in {"compact", "incremental"}:
+                errors.append("execution.context_budget must be compact or incremental")
+            override = execution.get("routing_override")
+            if override is not None:
+                if not isinstance(override, dict) or override.get("result") not in {"NOT_REQUESTED", "APPROVED"}:
+                    errors.append("execution.routing_override must be NOT_REQUESTED or APPROVED mapping")
+                elif override.get("result") == "APPROVED" and not (
+                        override.get("approved_by") and override.get("evidence")):
+                    errors.append("approved routing override requires approved_by and evidence")
         for key in ("writable", "protected"):
             values = data["scope"].get(key)
             if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
@@ -315,7 +352,8 @@ def start(root, task_id, with_worktree, approval=None):
         raise SystemExit(2)
     task = read_yaml(folder / "task.yaml")
     mode = task.get("execution", {}).get("mode", "direct")
-    if mode == "delegated":
+    routing = route_task(task)
+    if routing["backend"] != "direct":
         raise ValueError("Delegated task: use prepare instead of start")
     for dependency in task["planning"].get("depends_on", []):
         dep_state, _ = find_task(root, dependency)
@@ -352,6 +390,9 @@ def create(root, ident, title, objective, risk="low", mode="direct"):
         task["risk_controls"] = dict.fromkeys(task["risk_controls"], True)
     # An empty acceptance list keeps a scaffold invalid until a planner fills it.
     task["acceptance"] = []
+    task["checks"]["adversarial_probes"] = []
+    task["checks"]["fast_gate"] = []
+    task["checks"]["final_gate"] = []
     task["checks"]["required"] = []
     task["scope"]["writable"] = []
     write_yaml(folder / "task.yaml", task)
@@ -360,11 +401,34 @@ def create(root, ident, title, objective, risk="low", mode="direct"):
     return folder
 
 
-def status(root):
+def status(root, json_output=False):
+    tasks = {}
+    seen = set()
     for state, rel in STATES.items():
         base = root / rel
-        tasks = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
-        print(f"{state:12} {', '.join(tasks) if tasks else '-'}")
+        tasks[state] = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
+        if json_output:
+            for ident in tasks[state]:
+                checked_id(ident)
+                if ident in seen:
+                    raise ValueError(f"Task exists in multiple state folders: {ident}")
+                seen.add(ident)
+                data = read_yaml(base / ident / "task.yaml")
+                if data.get("id") != ident or data.get("status") != state:
+                    raise ValueError(f"Task identity/folder/status mismatch: {base / ident}")
+    if json_output:
+        print(json.dumps({
+            "schema_version": 1,
+            "repository": str(root),
+            "tasks": tasks,
+            "counts": {state: len(ids) for state, ids in tasks.items()},
+            "in_progress_tasks": tasks["IN_PROGRESS"],
+            "unfinished_tasks": sorted(ident for state, ids in tasks.items()
+                                       if state not in {"DONE", "ARCHIVED"} for ident in ids),
+        }, ensure_ascii=False, indent=2))
+    else:
+        for state, ids in tasks.items():
+            print(f"{state:12} {', '.join(ids) if ids else '-'}")
 
 
 def main():
@@ -380,7 +444,8 @@ def main():
     p.add_argument("--approval-file")
     p = sub.add_parser("worktree-create"); p.add_argument("task_id")
     p = sub.add_parser("worktree-remove"); p.add_argument("task_id"); p.add_argument("--force", action="store_true")
-    sub.add_parser("status")
+    p = sub.add_parser("status")
+    p.add_argument("--json", action="store_true", help="Read live task directories without modifying project summary")
     ns = ap.parse_args()
     root = repo_root()
     if ns.cmd == "validate":
@@ -390,7 +455,7 @@ def main():
     elif ns.cmd == "start": start(root, ns.task_id, ns.worktree, ns.approval_file)
     elif ns.cmd == "worktree-create": worktree_create(root, ns.task_id)
     elif ns.cmd == "worktree-remove": worktree_remove(root, ns.task_id, ns.force)
-    elif ns.cmd == "status": status(root)
+    elif ns.cmd == "status": status(root, ns.json)
     return 0
 
 

@@ -2,7 +2,6 @@ name = "explorer"
 description = "Read-only repository topology and dependency analysis subagent."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
-sandbox_mode = "read-only"
 developer_instructions = """
 Analyze repository structure, relevant files, dependencies, and data flow.
 Do not edit files, make architecture decisions, or broaden the task. Report

@@ -74,8 +74,46 @@ def require_approval(task, ident, path):
     data = read_yaml(Path(path)) if path else {}
     if not (data.get("task_id") == ident and data.get("contract_sha256") == digest(task)
             and data.get("result") == "APPROVED" and data.get("approved_by") and data.get("evidence")):
-        raise ValueError(f"Pre-review approval required for contract {digest(task)}; see docs/LOCAL_DELEGATION.md")
+        raise ValueError(
+            f"Pre-review approval required for contract {digest(task)}; "
+            "see references/task-protocol.md in the antigravity-delegate Skill"
+        )
     return data
+
+
+CHECK_STAGES = ("adversarial_probes", "fast_gate", "final_gate")
+
+
+def required_check_items(task):
+    """Return the ordered, de-duplicated required check manifest.
+
+    Schema-v2 tasks that only define ``checks.required`` keep their historical
+    behavior. New tasks may split checks into adversarial, fast, and final gates;
+    a non-empty legacy required list is appended as a compatibility final gate.
+    """
+    checks = task.get("checks") or {}
+    items = []
+    seen = set()
+    for section in (*CHECK_STAGES, "required"):
+        for item in checks.get(section, []) or []:
+            command = item.get("command") if isinstance(item, dict) else None
+            if isinstance(command, str) and command.strip() and command not in seen:
+                items.append(item)
+                seen.add(command)
+    return items
+
+
+def implementation_attempt_limit(execution):
+    """Map the new rework budget and legacy total-attempt budget to one limit."""
+    if "max_implementation_reworks" in execution:
+        reworks = execution["max_implementation_reworks"]
+        if type(reworks) is not int or not 0 <= reworks <= 9:
+            raise ValueError("max_implementation_reworks must be 0..9")
+        return reworks + 1
+    attempts = execution.get("max_execution_attempts", 2)
+    if type(attempts) is not int or not 1 <= attempts <= 10:
+        raise ValueError("max_execution_attempts must be 1..10")
+    return attempts
 
 
 def evidence_counts(task, receipt):
@@ -111,7 +149,7 @@ def evidence_counts(task, receipt):
         if not e.get("evidence"):
             raise ValueError("Malformed acceptance evidence: missing evidence content")
 
-    required = [item["command"] for item in task["checks"].get("required", [])]
+    required = [item["command"] for item in required_check_items(task)]
     passed = sum(any(c.get("command") == command and type(c.get("exit_code")) is int
                      and c["exit_code"] == 0 and c.get("result") == "PASS" for c in commands)
                  for command in required)
@@ -130,10 +168,7 @@ def validate_unverified_items(task, unverified_items):
         item["command"] if isinstance(item, dict) else item
         for item in task.get("checks", {}).get("optional", [])
     ]
-    required_commands = [
-        item["command"] if isinstance(item, dict) else item
-        for item in task.get("checks", {}).get("required", [])
-    ]
+    required_commands = [item["command"] for item in required_check_items(task)]
     errors = []
     for item in unverified_items:
         if not isinstance(item, dict):
@@ -340,3 +375,49 @@ def done_errors(task, folder):
     if controls.get("rollback_plan_required") and not (folder / "rollback.md").read_text(encoding="utf-8").strip():
         errors.append("Non-empty rollback plan required")
     return errors
+
+
+def route_task(task):
+    execution = task.get("execution", {})
+    if not isinstance(execution, dict):
+        raise ValueError("execution must be a mapping")
+    selected = execution.get("mode", "direct")
+    if selected not in {"direct", "delegated", "approval_required"}:
+        raise ValueError("Invalid execution.mode")
+    gated = task["planning"]["risk"] == "high" or any(task.get("authority", {}).values())
+    planning = task.get("planning", {})
+    adaptive_fields_present = any(key in planning for key in (
+        "work_type", "judgment", "context_continuity", "acceptance_determinism"
+    ))
+    high_judgment = adaptive_fields_present and (
+        planning.get("work_type") in {"semantic", "security", "architecture"}
+        or planning.get("judgment") == "high"
+        or planning.get("context_continuity") == "high"
+        or planning.get("acceptance_determinism") == "low"
+    )
+    override = execution.get("routing_override") or {}
+    overridden = override.get("result") == "APPROVED"
+    if high_judgment:
+        backend = "antigravity" if overridden else "direct"
+        mode = "approval_required" if overridden or gated or selected == "approval_required" else "direct"
+        reason = ("approved adaptive override requires independent approval"
+                  if overridden else
+                  "high-judgment or continuity-sensitive work defaults to direct")
+    elif selected == "direct":
+        backend = "direct"
+        mode = "approval_required" if gated else "direct"
+        reason = "planner selected direct"
+    else:
+        backend = "antigravity"
+        mode = "approval_required" if gated else selected
+        reason = "approved adaptive override" if high_judgment else (
+            "risk/architecture gate" if gated else "bounded deterministic delegation"
+        )
+    return {
+        "mode": mode,
+        "backend": backend,
+        "selected_mode": selected,
+        "high_judgment": high_judgment,
+        "override_applied": overridden and high_judgment,
+        "reason": reason,
+    }

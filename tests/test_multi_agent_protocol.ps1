@@ -89,6 +89,31 @@ Save-Config ([ordered]@{ tasks = @(
 Assert-True ($LASTEXITCODE -eq 0) "Large stdout launch failed"
 Assert-True ((Get-Item (Join-Path $largeOutput "large.md")).Length -ge 1000000) "Large stdout was truncated or blocked"
 
+$falseSuccessOutput = Join-Path $runtime "false-success"
+New-Item -ItemType Directory -Path $falseSuccessOutput | Out-Null
+$falseSuccessConfig = Join-Path $falseSuccessOutput "agents.json"
+Save-Config ([ordered]@{ tasks = @(
+    [ordered]@{ name = "permission"; worktree = $repo; mode = "plan"; prompt = "PERMISSION_DENIED"; max_retries = 1 },
+    [ordered]@{ name = "empty"; worktree = $repo; mode = "plan"; prompt = "EMPTY_OUTPUT"; max_retries = 0 },
+    [ordered]@{ name = "reported-empty"; worktree = $repo; mode = "plan"; prompt = "NO_OUTPUT_MESSAGE"; max_retries = 0 }
+) }) $falseSuccessConfig
+$savedPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& powershell -NoProfile -ExecutionPolicy Bypass -File $launch -ConfigPath $falseSuccessConfig -OutputDir $falseSuccessOutput -Executable $fakeAgy -MaxConcurrency 2 -MaxRetries 1 -DefaultTimeoutSeconds 60 2>&1 | Out-Null
+$falseSuccessExit = $LASTEXITCODE
+$ErrorActionPreference = $savedPreference
+Assert-True ($falseSuccessExit -eq 2) "False-success outputs did not fail the launcher"
+$falseSuccessRegistry = Get-Content (Join-Path $falseSuccessOutput "sessions.json") -Raw | ConvertFrom-Json
+$permission = @($falseSuccessRegistry.sessions | Where-Object { $_.name -eq "permission" })[0]
+$empty = @($falseSuccessRegistry.sessions | Where-Object { $_.name -eq "empty" })[0]
+$reportedEmpty = @($falseSuccessRegistry.sessions | Where-Object { $_.name -eq "reported-empty" })[0]
+Assert-True ($permission.failure_reason -eq "permission_blocked") "Permission auto-denial was not classified"
+Assert-True ($permission.attempts.Count -eq 1) "Permission auto-denial was retried without new authorization"
+Assert-True ($empty.failure_reason -eq "empty_output") "Exit-zero empty output was not classified"
+Assert-True ($reportedEmpty.failure_reason -eq "empty_output") "Exit-zero no-output message was not classified"
+Assert-True ($permission.attempts[0].elapsed_seconds -ge 0) "Attempt elapsed time was not recorded"
+Assert-True ($permission.attempts[0].stdout_bytes -gt 0) "Attempt stdout bytes were not recorded"
+
 $dagOutput = Join-Path $runtime "dag-retry"
 New-Item -ItemType Directory -Path $dagOutput | Out-Null
 $marker = Join-Path $dagOutput "retry.marker"

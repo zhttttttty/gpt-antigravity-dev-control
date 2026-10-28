@@ -1,107 +1,60 @@
 ---
 name: antigravity-delegate
-description: "在原生 Codex 角色与本地 Antigravity CLI 之间分配有界开发任务并核验契约证据。适用于独立执行或原生/本地混合协作；简单修改直接处理。"
+description: "将 Codex 的有界修改交给本地 agy：日常一条 run 命令返回实际改动与检查；复杂或高风险任务使用完整任务协议。"
 ---
 
-# 原生与 Antigravity 委派控制
+# Codex 调用 Antigravity
 
-本目录就是可复制的 Skill 包。控制器、任务模板、项目模板和参考协议都随 Skill
-分发；目标业务仓库只保存由 `init` 生成的最小 `.ai/` 运行状态。旧项目中已有的
-`.ai/scripts` 仍可兼容运行，但新项目不要复制整套控制平面。
+本 Skill 自带控制器、Adapter、模板和文档。主控负责需求、范围和最终验收；
+agy 实现有界修改。已有用户授权按当前会话适用，小改可由主控直接完成。
 
-## 首次接入
+## 日常入口
 
-从 Skill 包运行：
+适合范围清楚、低判断且可确定验收的机械修改，不需要额外创建 Codex 中转子代理。
+在已安装 Skill 的目标 Git 项目根目录运行：
 
-    python .agents/skills/antigravity-delegate/scripts/control.py init --repo PATH
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py run "清楚描述需要的修改" --allow "src/**" --allow "tests/**" --check "python -m unittest discover -s tests -v"
+```
 
-可选安装推荐的 Codex 角色配置：
+run 无需 init、模型配置或七文件契约，要求干净且已有提交的源仓库。
+它自动创建 codex/agy-* 分支和工作树，保存简短执行器报告、日志、实际 Diff 和调用者检查结果。
+未提交和被忽略文件不复制；不要为了运行而擅自丢弃或提交用户已有修改。
+用 --dry-run 预览；指定 Windows 原生 agy 可执行文件时用 --executable。
+需要真实终端处理确认时显式使用 --interactive，不静默绕过权限。
 
-    python .agents/skills/antigravity-delegate/scripts/control.py init --repo PATH --install-codex-profile
+收到 READY_FOR_REVIEW 后读取 result_file、Diff、全部未跟踪文件和检查日志，核对实际结果。
+控制台列表最多 20 项，完整清单保存在 result_file；tracked.diff 不包含新增未跟踪文件。
+检查未提供时为 NOT_RUN，非零退出、无效报告、范围违规或失败检查不能当成完成。
+不要自动合并、重试、删除现场，或将执行器的 COMPLETE 当作独立验收。
+详见[日常指南](references/quick-start.md)与[命令参考](references/cli.md)。
 
-初始化只创建 `.ai/tasks`、`.ai/project`、`.ai/templates/task`、`.ai/state` 和被 Git
-忽略的 `.ai/runtime`，不会覆盖已有文件。初始化后提交 `.ai` 中的契约模板与项目说明。
+## 什么时候升级为完整协议
 
-Codex 负责规划、路由、范围、验收和独立核验。此 Skill 提供确定性的本地执行协议，
-不是远程调度器，也不能静默替换普通 Codex 子任务。
+架构、认证、安全、迁移、部署、破坏性或需要持久审批/多轮返工的任务，先建立完整任务契约。
+使用 init/create/validate/route，再选择 direct 的 start 或本地委派 prepare/launch/collect。
+高级 route 同时返回 mode 和 backend。高判断、语义、安全、架构、强连续性或验收不确定的工作默认 direct；
+Root 选择 direct 后可明确派发有界 worker，不必先等待 agy 故障。
+agy 只写 IMPLEMENTED，退出后运行 verify 的获批检查矩阵，再 collect；不能把实现声明当成验证完成。
+高风险审批、独立 QA、回执和 DONE 门见[统一控制流程](references/workflow.md)。
+不要将已有受控任务改走 run 来绕过其审批或清空尝试历史。
+原生代理与 agy 的总容量、模型偏好和文件所有权见[编排规则](references/orchestration.md)。
+只有存在独立工作且实际获准时才派发原生代理，不为转发 agy 增加一层模型代理。
+只有需要多个独立审阅分片时才使用[多代理脚本](references/coordination-protocol.md)。
 
-## 混合执行
+## 权限与配置
 
-选择或混用后端时阅读[编排规则](references/orchestration.md)。
-需要可复制的完整流程、分阶段和高风险调用模板时阅读
-[调用提示词](references/invocation-prompts.md)。
-使用 `.ai/config.yaml` 模型偏好及 `.codex/agents/` 角色定义：
-默认 Sol high 作为唯一规划与最终决策主控，Luna high 负责有界只读探索、独立测试与
-审查，Antigravity 作为有界任务的默认实现后端。原生 Luna worker 只在 agy 不可用且
-Root 明确记录原因并批准切换后端时作为回退。
-用户或运行时的明确选择优先，报告实际使用情况。
+工作树隔离 Git 状态，不是操作系统沙箱。Scope 是事后检查，不能阻止拥有系统权限的进程越界。
+原生 Codex 子代理继承父会话权限；“不修改实现”是角色指令，不代表独立只读系统权限。
+代理文件内的 sandbox_mode、approval_policy、model_provider、mcp_servers 不覆盖父会话设置。
 
-小型低风险修改可由 Root 直接执行；边界明确的多文件实现默认使用本地 agy。
-Luna 的调查与审查输出是证据和建议，不能代替 Sol 的任务契约或最终结论。
-原生任务使用真实 `spawn_agent` 和 direct 协议，agy 使用 `control.py`；
-不要仅为转发 agy 启动原生代理，也不要对原生任务套用 agy 的 launch/collect。
+高级流程可选安装默认角色与项目配置：
 
-仅 Root 管理派发，提供契约、文件归属、精确 Worktree/版本、检查项和回执路径。
-原生与 agy 合计默认两个执行单元，由协调者管理，没有跨运行时硬锁。
-同一 Worktree 只有一个写入者，实现、测试和审查针对同一快照。
-返回精简证据和完整日志路径，如实报告不可用工具、失败与替代路径。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py init --install-codex-profile
+python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration
+```
 
-## 选择本地执行
-
-Codex 可以自动选择本 Skill；启动 Antigravity 前说明路由决定。
-
-- `direct`：小型修改、简短文档或配置，或需要持续交互推理的工作；原生 worker
-  仅作为明确批准的故障回退，不能静默替代 agy。
-- `delegated`：有界多文件实现、补充测试、独立重构或可通过命令核验的仓库审查。
-- `approval_required`：架构、认证、安全、迁移、部署、计费、破坏性或其他高风险工作。
-- 探测失败或准备与审查成本可能超过实现成本时，保持直接执行。
-
-自动选择 Skill 本身仅授权规划与只读探测。变更、权限绕过或受控执行前，落实任务
-要求的审批；已有明确用户授权按当前会话范围适用。
-
-## 本地协议
-
-1. 每次运行前探测实际可执行文件：
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File .agents/skills/antigravity-delegate/scripts/probe_agy.ps1 -Executable agy -OutputDir .ai/runtime/logs/probe
-
-   读取 `capabilities.json`，不要假设参数、模式、登录或代理列表命令可用。
-   控制器路由不是 `agy --mode`。全访问映射为省略 `--sandbox`；
-   自动批准对应 `--dangerously-skip-permissions`；只读审查用 `--mode plan`，
-   实现使用帮助中确认的编辑模式。全访问不会扩大契约。
-2. 单任务生命周期用 `control.py prepare` 创建 Worktree；
-   独立审查分片用 `create_review_worktree.ps1`，不要为同次执行创建两套目录。
-   使用返回的路径和分支。脏基线须按任务授权处理，不能自行假定允许。
-3. 单任务使用统一 CLI；多个有界分片阅读[协作协议](references/coordination-protocol.md)，
-   定义无环 `depends_on` 图并调用 `launch_agents.ps1`。扣除原生任务已占容量；
-   三到四个 agy 分片须先显式协调项目预算。启动器从两个开始，成功后才扩容。
-   独立写入使用独立 Worktree；本地启动器只约束自身任务，最多重试一次，首次失败后降为单并发。
-4. 固定输出目录保存 `sessions.json`、逐代理报告、stderr、执行日志和能力记录。
-   先运行 `collect_reports.ps1` 阅读摘要，再按需打开完整证据。
-5. agy 完全退出后再串行启动 Luna tester/reviewer；独立核验全部 P0/P1 的路径行号、
-   测试、验收和覆盖计数及 Worktree 状态，
-   将发现标记为确认、条件成立或假设。收集不会自动合并或迁入 DONE。
-6. 使用 `cleanup_worktree.ps1` 清理；只有干净 Worktree 可移除，强制清理需明确批准。
-
-## 仓库入口
-
-    python .agents/skills/antigravity-delegate/scripts/control.py <command>
-
-用 `create TASK-ID --title ... --objective ...` 生成任务，补齐并验证契约。
-创建 Worktree 前提交契约，基线必须等于 HEAD。状态命令在主控仓库执行，
-Worktree 内任务文件为快照。原生/direct 证据经 Root 写入输出的主控回执路径。
-DONE 要求当前 COMPLETE/REVIEWED 回执和已核验的证据。
-
-按当前阶段阅读[统一控制流程](references/workflow.md)、
-[执行模式](references/execution-modes.md)、[审查契约](references/review-contract.md)
-或[故障恢复](references/failure-recovery.md)；状态和回执说明见
-[任务协议](references/task-protocol.md)、[回执协议](references/receipt-protocol.md)
-与[Codex 流程](references/codex-workflow.md)。提示词示例见
-[调用提示词](references/invocation-prompts.md)。
-
-修改配置默认值后运行 `control.py check-orchestration`，它只检查仓库一致性。
-实际模型和角色以运行证据为准，不能由 TOML 推断。保留 Skill 名称，兼容
-`$antigravity-delegate` 调用。
-
-本 Skill 自带控制器和模板；执行时通过 `--repo` 指向目标仓库。目标仓库必须是 Git
-仓库。协议或入口缺失时报告前置条件；只有显式调用 `init` 才会生成运行状态。
+安装前预检冲突，默认保留不同内容；只有审查差异并获准替换后才加 --overwrite-codex-profile。
+配置检查只证明离线一致性，不能证明实际模型、权限或登录可用。不要虚构执行身份或用量。
+恢复既有任务先核对主控任务目录、Git、运行记录和实际进程，见[故障恢复](references/failure-recovery.md)。

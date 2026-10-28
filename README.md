@@ -1,210 +1,58 @@
-# gpt-antigravity-dev-control
+# Codex → Antigravity delegation
 
 [中文说明](README.zh-CN.md)
 
-A local-first AI development control plane: **Sol high decides and plans;
-Luna high explores and verifies; Antigravity / Gemini implements bounded tasks
-in Git worktrees; Sol makes the final acceptance decision; humans approve
-high-risk work and merge**.
+Delegate a bounded change to agy in one command. The controller creates an isolated Git worktree,
+saves logs, runs caller-supplied checks, and returns the actual changes for Codex to review.
+Risk-adaptive task routing and deterministic verification remain available for complex or high-risk work.
+This version integrates GitHub main at db1426b while retaining the local daily entry point and installation fixes.
 
-There is one task protocol and one primary CLI. Per-task `execution.mode` selects
-direct implementation, local delegation, or approval-required delegation.
+Version: **3.5.0-local**. The deliverable is `.agents/skills/antigravity-delegate/`.
 
-The primary deliverable is `.agents/skills/antigravity-delegate`. Copy that Skill into
-another Git project and initialize only its minimal `.ai/` runtime state:
+## Everyday use
+
+Use Git, Python 3.11+, and a working agy installation. Copy the entire Skill into your project.
+The source checkout must have a commit and be clean; uncommitted and ignored files are not copied.
 
 ```powershell
-python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
-python .agents/skills/antigravity-delegate/scripts/control.py --repo D:\Projects\my-app create TASK-001 --title "Bounded change" --objective "Observable result"
-```
-
-## Quick start
-
-```sh
 python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
-python .agents/skills/antigravity-delegate/scripts/control.py status
-python .agents/skills/antigravity-delegate/scripts/control.py probe
-python .agents/skills/antigravity-delegate/scripts/control.py --help
+python .agents/skills/antigravity-delegate/scripts/control.py run "Document installation in README" --allow README.md --check "git diff --check"
 ```
 
-Create a task from `.agents/skills/antigravity-delegate/templates/task/`, then choose its route:
-
-```yaml
-execution:
-  mode: delegated  # direct | delegated | approval_required
-  adapter: antigravity_cli
-  context_budget: compact
-  report_level: summary
-  max_execution_attempts: 2
-  escalation: codex_review
-```
-
-```sh
-python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
-python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
-python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
-python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
-python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
-```
-
-The older ai.py and delegate.py commands remain compatibility entry points;
-new usage should use control.py.
-
-## Use it inside Codex
-
-The project Plus profile uses Sol high as the sole planning, architecture, and
-final-acceptance authority; Luna high for bounded read-only exploration,
-independent testing, and review; and local Antigravity as the default implementation
-backend for delegated and approval-required tasks. A native Luna worker is an
-explicit fallback only after the root records why agy is unavailable or unsuitable
-and approves a route change to direct. Native threads are capped at two; the
-combined native/agy budget is root-coordinated, not a shared runtime lock. See
-[Hybrid Orchestration](.agents/skills/antigravity-delegate/references/orchestration.md).
-
-With Python 3.11+, run `python .agents/skills/antigravity-delegate/scripts/control.py check-orchestration` to detect
-project configuration drift. This is not runtime model or sandbox verification.
-
-The repository includes a discoverable skill at
-.agents/skills/antigravity-delegate. In a Codex task opened on this checkout,
-invoke $antigravity-delegate. Codex then owns the planning, command execution,
-receipt collection, review, and recovery flow; agy is started only as the local
-implementation subprocess.
-
-### Invocation
-
-Invoke the Skill directly in a Codex task:
-
-```text
-Use $antigravity-delegate to complete this feature:
-add email verification to the login flow and include tests.
-```
-
-To request the local Antigravity backend explicitly:
-
-```text
-Use $antigravity-delegate, delegate the implementation to Antigravity,
-work in an isolated Git worktree, and return the test results and receipt path.
-```
-
-The default handoff is sequential: a Luna explorer returns repository evidence;
-Sol creates the task contract; agy implements as the only writer; after agy exits,
-Luna tester/reviewer agents verify the same snapshot; Sol then reviews the diff,
-tests, and receipts and decides PASS, REWORK, or BLOCKED. No agent merges automatically.
-
-For a standalone Git project, initialize the minimal runtime state and probe the
-local executable first:
+No init, model profile, task.yaml, or manual receipts are required. Preview without calling agy:
 
 ```powershell
-python .agents/skills/antigravity-delegate/scripts/control.py init --repo D:\Projects\my-app
-Set-Location D:\Projects\my-app
-python .agents/skills/antigravity-delegate/scripts/control.py probe
+python .agents/skills/antigravity-delegate/scripts/control.py run "Document installation in README" --allow README.md --dry-run
 ```
 
-Create, validate, route, and run a bounded task:
+The command returns JSON with the worktree, diff, and check logs. Full results are retained under
+`agy-runs/<run-id>/result.json` in the Git common metadata directory. Console lists show at most
+20 paths. READY_FOR_REVIEW is a handoff, not acceptance; absent checks are marked NOT_RUN.
+Checks use native argv by default; opt into shell syntax with --shell-checks. Shared process execution
+provides per-command and total timeouts and checks the workspace after each command.
+The controller does not automatically commit, merge, retry, or discard the execution worktree.
 
-```powershell
-python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 `
-  --title "Add email verification login" `
-  --objective "Add verification checks and tests" `
-  --risk medium `
-  --mode delegated
+## Advanced tasks
 
-python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
-python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
-python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
-python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
-python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
-python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
-```
+For architecture, security, migrations, deployment, persistent approvals, or repeated rework,
+use the [full workflow](.agents/skills/antigravity-delegate/references/workflow.md).
+The full path uses adaptive backend selection and prepare/launch/verify/collect. Existing schema v2
+states, legacy required checks, approvals, receipts, and the DONE gate remain compatible.
 
-`route` returns `direct`, `delegated`, or `approval_required`. High-risk work
-must pass its approval gate first. A successful `collect` moves the task to
-review; it does not merge changes or declare the task complete. If `agy` is not
-on `PATH`, run `probe --executable <path-to-agy>`.
+## Boundaries
 
-Codex may select the Skill automatically for bounded multi-file work. Multi-agent
-runs use a dependency DAG, two concurrent agents by default, up to four for
-large read-only workloads after a healthy ramp-up, separate Worktrees for
-independent writers, one bounded retry with serial fallback, and a compact
-`summary.json`/`handoff.md` review handoff.
-
-![CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/workflows/ci.yml/badge.svg)
-
-## Flow
-
-```mermaid
-flowchart TD
-    H[Human intent] --> L[Luna high\nRead-only exploration]
-    L --> C[Sol high\nPlan / Architecture]
-    C --> T[Core Protocol\ntask.yaml + Risk Gates]
-    T --> R{execution.mode}
-    R -->|direct| D[Direct implementation]
-    R -->|delegated| A[Local agy + Git Worktree]
-    R -->|approval_required| X[Human Approval]
-    X --> A
-    D --> E[Receipt + Evidence]
-    A --> E
-    E --> V[Luna high\nIndependent verification]
-    V --> S[Sol\nFinal decision]
-    S -->|REWORK| T
-    S -->|PASS| M[Human Merge]
-```
-
-## Execution modes
-
-| Mode | Use when | Execution |
-|---|---|---|
-| `direct` | Root/manual work or bounded native Codex tasks | Root, human or native worker implements; root checks evidence |
-| `delegated` | Bounded multi-file implementation, tests, or refactors | Local agy implements in an isolated worktree |
-| `approval_required` | Architecture, security, migration, deployment, destructive, or other high-risk work | Approval artifact first, then local delegation |
-
-All modes share the same state machine, receipts, evidence rules, review gate,
-and human merge authority. See [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md).
-
-## Full-access launch
-
-For a disposable trusted worktree only:
-
-```sh
-python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
-```
-
-This explicitly passes agy's `--dangerously-skip-permissions`; it does not grant
-administrator rights or disable scope, receipt, review, and merge gates.
-
-## Core guarantees
-
-- `.ai/` and Git are durable project truth.
-- `task.yaml` defines scope, authority, risk, routing, and acceptance criteria.
-- Executor `COMPLETE` is not reviewer `PASS`.
-- Delegated and medium/high-risk implementation uses isolated Git worktrees.
-- Missing evidence fails closed; REWORK preserves earlier attempt evidence.
-- Full logs remain local and compact receipts are reviewed first.
-- The controller never automatically merges or declares a task DONE.
+Writable scopes are checked after execution. A Git worktree is not an operating-system sandbox.
+Native Codex agents inherit parent-session permissions; sandbox_mode in a custom agent file
+cannot create a separate read-only boundary. Optional model profiles serve advanced orchestration;
+offline configuration agreement does not prove runtime model access.
+The implementation is tested with fake executors; actual agy access, task quality, and usage still
+require measurement.
 
 ## Documentation
 
-### Usage
+- [Everyday guide](.agents/skills/antigravity-delegate/references/quick-start.md), [CLI reference](.agents/skills/antigravity-delegate/references/cli.md).
+- [Documentation map](docs/README.md), [integration record](docs/maintenance/upstream-integration-2026-10-28.md), [current status](docs/STATUS.md).
+- [Contributing](CONTRIBUTING.md), [security](SECURITY.md), [cost measurement](COST_METRICS.md).
 
-- [Invocation Prompts: Sol + Luna + Antigravity](.agents/skills/antigravity-delegate/references/invocation-prompts.md)
-- [Quick Start](.agents/skills/antigravity-delegate/references/workflow.md)
-- [Control Workflow](.agents/skills/antigravity-delegate/references/workflow.md)
-- [Local Delegation Operations](.agents/skills/antigravity-delegate/references/delegation.md)
-
-### Technical reference
-
-- [Documentation map](.agents/skills/antigravity-delegate/SKILL.md)
-- [Execution Modes](.agents/skills/antigravity-delegate/references/orchestration.md)
-- [Architecture](.agents/skills/antigravity-delegate/references/workflow.md)
-- [Current Limitations](.agents/skills/antigravity-delegate/references/delegation.md)
-- [Cost Measurement](COST_METRICS.md)
-- [Risk Gates](.agents/skills/antigravity-delegate/references/workflow.md)
-
-## Status
-
-Current version: **3.3.0-local**. The project is a local control workflow; no
-remote scheduler, reviewer API, or fixed token-savings claim is required.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+Historical material and independent nested checkouts are preserved; consult the folder guide.
+License: [MIT](LICENSE).

@@ -2,7 +2,6 @@ name = "researcher"
 description = "Read-only documentation and dependency research subagent."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
-sandbox_mode = "read-only"
 developer_instructions = """
 Research only the technical question assigned. Prefer primary documentation and
 the repository's existing dependency constraints. Do not edit files or introduce

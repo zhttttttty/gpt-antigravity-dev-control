@@ -12,7 +12,12 @@ execution:
   model: configured_default
   context_budget: compact
   report_level: summary
-  max_execution_attempts: 2
+  max_implementation_reworks: 1
+  max_infra_retries: 1
+  routing_override:
+    result: NOT_REQUESTED
+    approved_by: null
+    evidence: null
   escalation: codex_review
 
 planning:
@@ -21,6 +26,10 @@ planning:
   requirements: [FR-001]
   depends_on: []
   risk: medium
+  work_type: mechanical
+  judgment: medium
+  context_continuity: low
+  acceptance_determinism: high
 
 roles:
   planner: gpt-5.6-sol
@@ -59,9 +68,13 @@ acceptance:
     evidence: <test/command/file/behavior>
 
 checks:
-  required:
-    - command: <test command>
-      purpose: <what it verifies>
+  # Put highest-risk counterexamples first, then affected-scope checks, then
+  # the full regression/release matrix. At least one required gate is needed.
+  adversarial_probes: []
+  fast_gate: []
+  final_gate: []
+  # Legacy schema-v2 tasks may keep all required checks here.
+  required: []
   optional: []
 
 risk_controls:

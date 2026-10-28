@@ -10,13 +10,8 @@ import tomllib
 import yaml
 
 
-NATIVE_ROLES = {
-    "explorer": "read-only",
-    "worker": "workspace-write",
-    "tester": "workspace-write",
-    "researcher": "read-only",
-    "reviewer": "read-only",
-}
+NATIVE_ROLES = ("explorer", "worker", "tester", "researcher", "reviewer")
+INHERITED_SETTINGS = ("sandbox_mode", "approval_policy", "model_provider", "mcp_servers")
 
 
 def validate(root: Path) -> list[str]:
@@ -53,6 +48,11 @@ def validate(root: Path) -> list[str]:
 
     canonical = read(".ai/config.yaml")
     config = read(".codex/config.toml")
+    roles = {name: read(f".codex/agents/{name}.toml") for name in NATIVE_ROLES}
+    if errors:
+        # Report missing/malformed inputs once instead of cascading None/None
+        # comparisons that hide the actionable file errors.
+        return errors
     policy = value(canonical, "orchestration") or {}
     for role in ("architect", "planner"):
         same(f"root model / {role}", config.get("model"), value(canonical, "roles", role, "preferred_model"))
@@ -68,10 +68,12 @@ def validate(root: Path) -> list[str]:
         errors.append("native limit exceeds coordinator combined limit")
     same("combined enforcement", value(policy, "combined_limit_enforcement"), "coordinator")
 
-    for name, sandbox in NATIVE_ROLES.items():
-        data = read(f".codex/agents/{name}.toml")
+    for name in NATIVE_ROLES:
+        data = roles[name]
         same(f"{name}.name", data.get("name"), name)
-        same(f"{name}.sandbox_mode", data.get("sandbox_mode"), sandbox)
+        for setting in INHERITED_SETTINGS:
+            if setting in data:
+                errors.append(f"{name}.{setting}: custom agents inherit this session setting; remove this ineffective override")
         if name == "reviewer":
             model = value(canonical, "roles", "reviewer", "preferred_model")
             effort = value(canonical, "roles", "reviewer", "reasoning_effort")
@@ -103,7 +105,7 @@ def main() -> int:
     errors = validate(Path.cwd())
     print(json.dumps({
         "status": "FAIL" if errors else "PASS",
-        "scope": "offline repository agreement only; runtime routing and model access NOT_RUN",
+        "scope": "offline repository agreement only; runtime routing, model access and permission enforcement NOT_RUN",
         "errors": errors,
     }, indent=2))
     return 1 if errors else 0

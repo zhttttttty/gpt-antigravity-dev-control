@@ -21,6 +21,13 @@ public static class FakeAgy
         if (args.Contains("agent") || args.Contains("agents")) { return 0; }
         var promptArgument = args.FirstOrDefault(value => value.StartsWith("--print=")) ?? "";
         var prompt = promptArgument.StartsWith("--print=") ? promptArgument.Substring(8) : promptArgument;
+        if (prompt.Contains("PERMISSION_DENIED"))
+        {
+            Console.WriteLine("jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow.");
+            return 0;
+        }
+        if (prompt.Contains("EMPTY_OUTPUT")) { return 0; }
+        if (prompt.Contains("NO_OUTPUT_MESSAGE")) { Console.WriteLine("jetski: no output produced"); return 0; }
         var logIndex = Array.IndexOf(args, "--log-file");
         if (logIndex >= 0 && logIndex + 1 < args.Length)
         {

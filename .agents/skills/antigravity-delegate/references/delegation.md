@@ -40,7 +40,7 @@ agy.log 可能含路径、Prompt 或私有代码，应只保存在本地并在�
 
 可信的一次性 Worktree 可以显式使用：
 
-    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --full-access
+    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --auto-approve
 
 该选项只向 agy 传递 permission-bypass 参数，不授予管理员权限，也不会移除 Scope、
 Receipt、Review 或人工合并门。永远不要静默启用。
@@ -66,7 +66,7 @@ Receipt、Review 或人工合并门。永远不要静默启用。
 枚举文件不等于完成语义阅读。
 
 这些锁和限制只覆盖 agy 启动器。Root 还需把原生 Codex 工作计入合计预算（默认
-两个活跃单元），使用更高本地容量前先协调调整预算。见 [混合执行](HYBRID_ORCHESTRATION.md)。
+两个活跃单元），使用更高本地容量前先协调调整预算。见 [混合执行](orchestration.md)。
 单任务由 control.py prepare 创建隔离目录；上面的 review-worktree 脚本用于独立分片，
 不要为同一任务重复准备第二个 Worktree。
 
@@ -80,6 +80,7 @@ HEAD；本地委派始终要求 Worktree 隔离。持久依赖必须已是 DONE 
     python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
     python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
     python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+    python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
     python .agents/skills/antigravity-delegate/scripts/control.py status TASK-001
     python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 
@@ -126,4 +127,4 @@ review.yaml。高风险任务还必须满足额外 Risk Gate 和人工审批。
   控制器不保证跨多个文件的崩溃安全事务，也不自动清理或备份运行记录。
 
 离线测试使用临时 Git 仓库和伪 agy，不消耗 Provider 额度，也不能证明真实编码质量、
-无人值守可靠性或 Token 节省。真实效果按 [用量测量](../COST_METRICS.md)记录。
+无人值守可靠性或 Token 节省。真实效果按 [用量测量](cost-metrics.md)记录。

@@ -1,12 +1,11 @@
 name = "worker"
-description = "Explicit fallback implementation subagent when local Antigravity is unavailable and the root approves a backend change."
+description = "Bounded direct implementation subagent after the root selects and authorizes the direct backend."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
 developer_instructions = """
-Act only after the Sol root explicitly records why Antigravity cannot execute
-and approves switching the task to the native direct backend. Never become the
-default implementation path. Implement only the assigned task contract. Keep
+Act only after the root explicitly selects the direct backend and supplies the
+bounded task, workspace, scope and evidence requirements. Do not silently change
+backends or launch Antigravity. Implement only the assigned task contract. Keep
 changes minimal, do not edit
 architecture, public APIs, schemas, dependencies, or task authority unless the
 contract explicitly allows it. Run the requested checks and report changed files,

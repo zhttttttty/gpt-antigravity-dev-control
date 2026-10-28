@@ -37,12 +37,21 @@ class OrchestrationConfigTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("NOT_RUN", result.stdout)
 
-    def test_detects_wrong_reviewer_model_and_write_access(self):
+    def test_detects_wrong_reviewer_model_and_ineffective_permission_override(self):
         path = self.root / ".codex/agents/reviewer.toml"
-        path.write_text(path.read_text(encoding="utf-8").replace('"gpt-5.6-luna"', '"gpt-5.6-terra"').replace('"read-only"', '"workspace-write"'), encoding="utf-8")
+        path.write_text('sandbox_mode = "read-only"\n' + path.read_text(encoding="utf-8").replace('"gpt-5.6-luna"', '"gpt-5.6-terra"'), encoding="utf-8")
         errors = "\n".join(CHECK.validate(self.root))
         self.assertIn("reviewer.model:", errors)
         self.assertIn("reviewer.sandbox_mode:", errors)
+        self.assertIn("ineffective override", errors)
+
+    def test_provider_and_mcp_cannot_be_overridden_in_an_agent(self):
+        path = self.root / ".codex/agents/worker.toml"
+        path.write_text('model_provider = "different-provider"\napproval_policy = "never"\n'
+                        'mcp_servers = {}\n' + path.read_text(encoding="utf-8"), encoding="utf-8")
+        errors = "\n".join(CHECK.validate(self.root))
+        for setting in ("model_provider", "approval_policy", "mcp_servers"):
+            self.assertIn(f"worker.{setting}:", errors)
 
     def test_cli_failure_and_help(self):
         (self.root / ".codex/config.toml").unlink()
@@ -69,6 +78,13 @@ class OrchestrationConfigTests(unittest.TestCase):
         errors = "\n".join(CHECK.validate(self.root))
         self.assertIn("worker.toml:", errors)
         self.assertIn("tester.toml:", errors)
+
+    def test_missing_inputs_report_file_errors_without_cascading_comparisons(self):
+        with tempfile.TemporaryDirectory() as missing:
+            errors = CHECK.validate(Path(missing))
+        self.assertEqual(len(errors), 7)
+        self.assertTrue(all(".yaml:" in item or ".toml:" in item for item in errors))
+        self.assertFalse(any("got None" in item for item in errors))
 
     def test_invalid_policy_shapes_and_boolean_limit_fail(self):
         path = self.root / ".ai/config.yaml"

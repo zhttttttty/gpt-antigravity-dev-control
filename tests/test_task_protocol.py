@@ -16,6 +16,17 @@ from task_data import read_yaml, write_yaml, parse_yaml, digest
 
 
 class TaskProtocolTests(unittest.TestCase):
+    def test_adaptive_direct_backend_can_start_despite_original_delegated_selection(self):
+        self.task["execution"]["mode"] = "delegated"
+        self.task["planning"].update(work_type="semantic", judgment="high")
+        self.task["roles"]["executor"] = "codex"
+        write_yaml(self.folder / "task.yaml", self.task)
+        self.commit()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.folder = ai.start(self.root, "TASK-TEST", True)
+        self.assertEqual(read_yaml(self.folder / "task.yaml")["status"], "IN_PROGRESS")
+        self.assertTrue((self.root / ".worktrees/TASK-TEST").is_dir())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="task protocol ")
         self.root = Path(self.temp.name).resolve()

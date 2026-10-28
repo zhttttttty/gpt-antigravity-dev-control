@@ -10,8 +10,6 @@ import io
 import json
 import os
 from pathlib import Path
-import shlex
-import signal
 import subprocess
 import sys
 import tempfile
@@ -19,9 +17,10 @@ import time
 
 import yaml
 import ai
+from process_utils import run_command
 from task_data import (CHECK_STAGES, digest, evidence_counts,
                        implementation_attempt_limit, read_yaml,
-                       required_check_items, require_approval, task_id,
+                       required_check_items, require_approval, route_task, task_id,
                        validate_unverified_items, write_yaml)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "adapters"))
@@ -87,49 +86,7 @@ def load_task(root, ident):
 
 
 def route(task):
-    execution = task.get("execution", {})
-    if not isinstance(execution, dict):
-        raise ValueError("execution must be a mapping")
-    selected = execution.get("mode", "direct")
-    if selected not in {"direct", "delegated", "approval_required"}:
-        raise ValueError("Invalid execution.mode")
-    gated = task["planning"]["risk"] == "high" or any(task.get("authority", {}).values())
-    planning = task.get("planning", {})
-    adaptive_fields_present = any(key in planning for key in (
-        "work_type", "judgment", "context_continuity", "acceptance_determinism"
-    ))
-    high_judgment = adaptive_fields_present and (
-        planning.get("work_type") in {"semantic", "security", "architecture"}
-        or planning.get("judgment") == "high"
-        or planning.get("context_continuity") == "high"
-        or planning.get("acceptance_determinism") == "low"
-    )
-    override = execution.get("routing_override") or {}
-    overridden = override.get("result") == "APPROVED"
-    if high_judgment:
-        backend = "antigravity" if overridden else "direct"
-        mode = "approval_required" if overridden or gated else "direct"
-        reason = ("approved adaptive override requires independent approval"
-                  if overridden else
-                  "high-judgment or continuity-sensitive work defaults to direct")
-    elif selected == "direct":
-        backend = "direct"
-        mode = "approval_required" if gated else "direct"
-        reason = "planner selected direct"
-    else:
-        backend = "antigravity"
-        mode = "approval_required" if gated else selected
-        reason = "approved adaptive override" if high_judgment else (
-            "risk/architecture gate" if gated else "bounded deterministic delegation"
-        )
-    return {
-        "mode": mode,
-        "backend": backend,
-        "selected_mode": selected,
-        "high_judgment": high_judgment,
-        "override_applied": overridden and high_judgment,
-        "reason": reason,
-    }
+    return route_task(task)
 
 
 def _reuse_terminal_worktree(root, ident, task, previous_record, previous_run_dir,
@@ -480,25 +437,6 @@ def _utc_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def _terminate_process_tree(process):
-    """Best-effort bounded teardown for a timed-out verification command."""
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            check=False, capture_output=True,
-        )
-    else:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
 
 
 def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approval=None):
@@ -591,26 +529,9 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
             continue
         effective_timeout = min(command_timeout, remaining)
         use_shell = item.get("shell") is True
-        argv = command if use_shell else shlex.split(command, posix=True)
-        if not argv:
-            raise ValueError("Verification command cannot be empty")
-        popen_options = {"start_new_session": True} if os.name != "nt" else {
-            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP
-        }
-        try:
-            with log_path.open("w", encoding="utf-8", errors="replace") as stream:
-                process = subprocess.Popen(
-                    argv, cwd=worktree, shell=use_shell, stdout=stream,
-                    stderr=subprocess.STDOUT, text=True, **popen_options,
-                )
-                try:
-                    exit_code = process.wait(timeout=effective_timeout)
-                except subprocess.TimeoutExpired:
-                    _terminate_process_tree(process)
-                    stream.write("\nTIMEOUT\n")
-                    exit_code = 124
-        except subprocess.TimeoutExpired:
-            exit_code = 124
+        check_result = run_command(command, cwd=worktree, log=log_path,
+                                   timeout=effective_timeout, shell=use_shell)
+        exit_code = check_result["exit_code"]
         workspace_reason = None
         if git(worktree, "branch", "--show-current") != record["branch"]:
             workspace_reason = "verification command changed branch"
@@ -625,6 +546,8 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
             "command": command, "exit_code": exit_code, "result": outcome,
             "log": str(log_path), "stage": stage, "shell": use_shell,
         }
+        if check_result.get("error"):
+            result["reason"] = check_result["error"]
         if workspace_reason:
             result["reason"] = workspace_reason
         results.append(result)

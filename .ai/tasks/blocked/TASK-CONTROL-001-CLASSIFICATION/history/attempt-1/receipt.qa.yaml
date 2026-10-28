@@ -1,0 +1,56 @@
+schema_version: 2
+task_id: TASK-CONTROL-001-CLASSIFICATION
+contract_revision: 1
+attempt: 1
+reviewer: luna_explore_token_hunter (Luna high, independent)
+status: REVIEWED
+reviewed_at: '2026-09-16'
+risk_gate:
+  tier: high
+  result: FAIL
+  missing_evidence:
+  - Complete workspace fail-closed validation and issue-bound residual-risk approval
+scope_review:
+  result: PASS
+  findings:
+  - All nine changed files exactly match writable contract; collect FAIL is a hardcoded .agents protection conflict, not executor scope expansion.
+acceptance_review:
+- acceptance_id: AC-C001
+  result: NOT_RUN
+  evidence_checked: Auth recovery tests pass but canonical-valid receipt requirement remains conditional; status-only receipt accepted by diagnostic.
+- acceptance_id: AC-C002
+  result: FAIL
+  evidence_checked: delegate.py workspace absent/null/empty skips required identity validation.
+- acceptance_id: AC-C003
+  result: PASS
+  evidence_checked: Independent 69-test suite and optional/required exact-match negative cases pass.
+- acceptance_id: AC-C004
+  result: FAIL
+  evidence_checked: Independent probe SEC1 security issue with unrelated DOC9 cosmetic QA disposition returns no errors; arbitrary approval accepted.
+regression_review:
+  result: PASS
+  findings:
+  - Independent unittest 69 passed; compileall and fixed-base diff check exit 0 at b9ac267785baf4264d0e6570dd346b5d22a571a0, clean.
+security_review:
+  result: NOT_APPLICABLE
+  findings: []
+architecture_review:
+  result: UNKNOWN
+  findings: []
+cross_family_review:
+  required: false
+  result: NOT_APPLICABLE
+  reviewer: null
+  findings: []
+human_approval:
+  required: false
+  result: NOT_APPLICABLE
+  approved_by: null
+  approved_at: null
+blocking_findings:
+- CONFIRMED workspace missing/null/empty fail-open (AC-C002).
+- CONFIRMED known issue review lacks identity binding and meaningful approval evidence (AC-C004).
+- CONFIRMED controller .agents hard protection contradicts exact writable contract and blocks collect.
+non_blocking_findings: []
+verdict: BLOCKED
+notes: Root transcribed independent Luna evidence; Luna recommended REWORK, Sol final BLOCKED because attempt1/max1 exhausted. No merge approval, no implementation changes by reviewer.

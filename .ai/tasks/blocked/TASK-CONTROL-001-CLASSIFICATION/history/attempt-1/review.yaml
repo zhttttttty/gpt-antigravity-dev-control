@@ -1,0 +1,12 @@
+schema_version: 2
+task_id: TASK-CONTROL-001-CLASSIFICATION
+attempt: 1
+verdict: BLOCKED
+summary: Sol high final BLOCKED. Luna independently ran 69 passing tests but confirmed workspace and issue-review gaps; control scope conflict prevents collect. Attempt1/max1 consumed; additional controller rework requires explicit authorization. Business rework budgets remain unused; no merge or controller activation.
+findings:
+- CONFIRMED AC-C002 fails closed-identity requirement for absent/null/empty workspace.
+- CONFIRMED AC-C004 unrelated issue disposition and arbitrary approval can pass.
+- CONFIRMED exact nine writable files rejected by hardcoded .agents scope protection; not AGY scope expansion.
+- CONDITIONAL auth diagnostic canonical-valid receipt claim lacks complete schema checks.
+follow_up_tasks: []
+state_transition: IN_PROGRESS -> BLOCKED by original controller collect; remains BLOCKED after Sol decision

@@ -375,3 +375,49 @@ def done_errors(task, folder):
     if controls.get("rollback_plan_required") and not (folder / "rollback.md").read_text(encoding="utf-8").strip():
         errors.append("Non-empty rollback plan required")
     return errors
+
+
+def route_task(task):
+    execution = task.get("execution", {})
+    if not isinstance(execution, dict):
+        raise ValueError("execution must be a mapping")
+    selected = execution.get("mode", "direct")
+    if selected not in {"direct", "delegated", "approval_required"}:
+        raise ValueError("Invalid execution.mode")
+    gated = task["planning"]["risk"] == "high" or any(task.get("authority", {}).values())
+    planning = task.get("planning", {})
+    adaptive_fields_present = any(key in planning for key in (
+        "work_type", "judgment", "context_continuity", "acceptance_determinism"
+    ))
+    high_judgment = adaptive_fields_present and (
+        planning.get("work_type") in {"semantic", "security", "architecture"}
+        or planning.get("judgment") == "high"
+        or planning.get("context_continuity") == "high"
+        or planning.get("acceptance_determinism") == "low"
+    )
+    override = execution.get("routing_override") or {}
+    overridden = override.get("result") == "APPROVED"
+    if high_judgment:
+        backend = "antigravity" if overridden else "direct"
+        mode = "approval_required" if overridden or gated or selected == "approval_required" else "direct"
+        reason = ("approved adaptive override requires independent approval"
+                  if overridden else
+                  "high-judgment or continuity-sensitive work defaults to direct")
+    elif selected == "direct":
+        backend = "direct"
+        mode = "approval_required" if gated else "direct"
+        reason = "planner selected direct"
+    else:
+        backend = "antigravity"
+        mode = "approval_required" if gated else selected
+        reason = "approved adaptive override" if high_judgment else (
+            "risk/architecture gate" if gated else "bounded deterministic delegation"
+        )
+    return {
+        "mode": mode,
+        "backend": backend,
+        "selected_mode": selected,
+        "high_judgment": high_judgment,
+        "override_applied": overridden and high_judgment,
+        "reason": reason,
+    }

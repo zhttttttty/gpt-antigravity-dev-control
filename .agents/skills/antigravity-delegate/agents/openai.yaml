@@ -1,6 +1,6 @@
 interface:
   display_name: "Codex + Antigravity Delegate"
-  short_description: "Risk-adaptive Codex and Antigravity delegation"
-  default_prompt: "Use $antigravity-delegate to route high-judgment or continuity-sensitive work to direct Codex and bounded mechanical work to Antigravity, with deterministic verification, independent review, and no automatic merge."
+  short_description: "One-command agy runs with risk-aware escalation"
+  default_prompt: "Use $antigravity-delegate. Prefer one run for bounded low-judgment changes, keep high-judgment or continuity-sensitive work direct, and use the full adaptive contract plus deterministic verify when persistent approvals are needed. Return actual changes and checks for independent review; never merge automatically."
 policy:
   allow_implicit_invocation: true

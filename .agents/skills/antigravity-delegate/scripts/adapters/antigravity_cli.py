@@ -11,7 +11,7 @@ import yaml
 
 
 class AntigravityCLI:
-    def __init__(self, executable="agy", args=None, timeout=1260, interactive=False, full_access=False, mode="accept-edits"):
+    def __init__(self, executable="agy", args=None, timeout=1260, interactive=False, full_access=False, mode="accept-edits", launch_prompt=None):
         self.executable = executable
         self.args = args
         self.timeout = timeout
@@ -19,6 +19,7 @@ class AntigravityCLI:
         self.full_access = full_access
         self.mode = mode
         self._capabilities = None
+        self.launch_prompt = launch_prompt
 
     def validate_launch(self):
         self.resolve()
@@ -69,6 +70,8 @@ class AntigravityCLI:
                 "Do not read/write QA or review files, expand scope, merge, push, or claim unexecuted tests passed. "
             )
         prompt += "If a permission is denied, report the blocker; do not search alternative directories."
+        if self.launch_prompt is not None:
+            prompt = self.launch_prompt
         if self.args is not None:
             args = self.args
         else:

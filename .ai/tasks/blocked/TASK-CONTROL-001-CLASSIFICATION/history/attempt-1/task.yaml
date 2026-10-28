@@ -1,0 +1,105 @@
+schema_version: 2
+id: TASK-CONTROL-001-CLASSIFICATION
+title: Bounded receipt risk classification repair
+status: BLOCKED
+contract_revision: 1
+attempt: 1
+execution:
+  mode: approval_required
+  adapter: antigravity_cli
+  model: configured_default
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 1
+  escalation: codex_review
+planning:
+  milestone: M1
+  epic: EPIC-001
+  requirements:
+  - FR-001
+  depends_on: []
+  risk: high
+roles:
+  planner: gpt-5.6-sol
+  executor: antigravity
+  reviewer: gpt-5.6-luna
+objective: Classify optional checks and accepted residual risk without bypassing required
+  evidence or malformed receipts
+scope:
+  writable:
+  - .agents/skills/antigravity-delegate/scripts/adapters/antigravity_cli.py
+  - .agents/skills/antigravity-delegate/scripts/delegate.py
+  - .agents/skills/antigravity-delegate/scripts/task_data.py
+  - .agents/skills/antigravity-delegate/templates/task/receipt.executor.yaml
+  - .agents/skills/antigravity-delegate/templates/task/receipt.qa.yaml
+  - .agents/skills/antigravity-delegate/references/receipt-protocol.md
+  - .agents/skills/antigravity-delegate/references/workflow.md
+  - tests/test_local_delegation.py
+  - tests/test_task_protocol.py
+  protected:
+  - .ai/project/ARCHITECTURE.md
+  - migrations/**
+  out_of_scope:
+  - Do not weaken canonical COMPLETE/BLOCKED/FAILED, result PASS, acceptance_id, base/head
+    identity, or required check gates.
+  - Do not retrospectively repair run-1 receipts, approve risk on behalf of QA/Sol,
+    auto-merge, push, deploy, or edit outside writable files.
+  - Do not modify CLI permissions, sandbox defaults, task transition mechanics, or
+    business code.
+authority:
+  architecture_change: false
+  database_schema_change: false
+  public_api_change: false
+  auth_security_change: true
+  major_dependency_change: false
+  deployment_change: false
+isolation:
+  worktree: true
+  base_branch: ai/control-governance-20260916
+  branch: ai/local/TASK-CONTROL-001-CLASSIFICATION-1
+acceptance:
+- id: AC-C001
+  criterion: Diagnose ignores an earlier login warning when a later successful authorization
+    and valid canonical receipt are present; current true auth failures remain AUTH_REQUIRED.
+  evidence: Offline recovered-auth and true-auth-failure tests with exact diagnostic
+    categories.
+- id: AC-C002
+  criterion: Collect verifies executor workspace base/head/branch/path against controller
+    Git observations before overwriting claims, and rejects malformed completion/evidence
+    fields.
+  evidence: Negative tests for wrong base/head and SUCCESS/COMPLETED, PASSED, id/status
+    receipt formats.
+- id: AC-C003
+  criterion: Only structured optional NOT_RUN items whose command exactly matches
+    task.checks.optional and whose reason is nonempty may remain unverified; required
+    command or acceptance gaps still BLOCKED.
+  evidence: Positive optional and negative required/unknown/unstructured tests across
+    collect and DONE gates.
+- id: AC-C004
+  criterion: Known issues enter REVIEW with original text and a non-PASS issue marker;
+    DONE requires one-to-one independent QA disposition, evidence checked, risk-owner
+    approval for accepted residual, PASS_WITH_NOTES review, and existing high-risk
+    human merge gate.
+  evidence: Tests show reported issues never auto-DONE, blocking/unreviewed issues
+    fail, accepted residual only passes the explicit QA/risk gates.
+checks:
+  required:
+  - command: python -m unittest discover -s tests -v
+  - command: python -m compileall -q .agents/skills/antigravity-delegate/scripts tests
+  - command: git diff --check ai/control-governance-20260916...HEAD
+  optional: []
+risk_controls:
+  rollback_plan_required: true
+  cross_family_review_required: true
+  human_merge_approval_required: true
+artifacts:
+  brief: brief.md
+  context: context.md
+  executor_receipt: receipt.executor.yaml
+  qa_receipt: receipt.qa.yaml
+  review: review.yaml
+  rollback: rollback.md
+metadata:
+  created_at: '2026-09-16T02:34:07+00:00'
+  updated_at: '2026-09-16T07:13:41+00:00'
+  created_by: gpt-5.6-sol

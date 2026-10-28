@@ -1,0 +1,16 @@
+schema_version: 2
+task_id: TASK-ROUTE-001-END-TO-END
+attempt: 2
+verdict: REWORK
+summary: Sol retains Luna REWORK for immutable e553 source snapshot. Independent73 tests and core parser/handle/risk gates PASS, but basename-only controller identity violates AC-R003. Separate TASK003 be9 fixes identity; collecting old receipt does not rewrite this verdict or authorize merge.
+findings:
+- severity: P0
+  status: CONFIRMED
+  acceptance_id: AC-R003
+  file: .agents/skills/antigravity-delegate/scripts/delegate.py
+  line: 249
+  description: e553 accepted nonexistent same-name directory as controller repository. Independently repaired in TASK003 be9 without mutating original snapshot.
+follow_up_tasks:
+- TASK-ROUTE-003-IDENTITY-BOOTSTRAP
+- TASK-ROUTE-002-SMOKE
+state_transition: null

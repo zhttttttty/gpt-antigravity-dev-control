@@ -1,12 +1,22 @@
 # 调用提示词
 
+日常低判断、可确定验收的机械修改可以直接在 Codex 中说：
+
+```text
+使用 $antigravity-delegate，让 agy 完成【需求】。
+只允许修改【路径】，执行【检查命令】。完成后检查实际 Diff 和日志，不自动合并。
+```
+
+这类任务优先使用[run](quick-start.md)，无需七文件契约。以下多角色模板用于高级任务；
+高判断、语义、安全或强上下文工作由 Root 选择 direct，不机械地把所有编码交给 agy。
+
 本页给出 `Sol high + Luna high + Antigravity` 的可复制调用方式。通常只需在任务开头
 显式写出 `$antigravity-delegate`；Codex 也可能根据任务描述自动选择本 Skill，但显式调用
 更容易固定工作流和停止点。
 
-## 推荐：一次调用完成完整流程
+## 高级：一次调用完成完整流程
 
-日常任务优先使用下面的短提示词：
+需要持久契约和独立审查的任务可使用下面的短提示词：
 
 ```text
 使用 $antigravity-delegate 按 Sol high + Luna high + Antigravity 默认流程完成：

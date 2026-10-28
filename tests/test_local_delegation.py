@@ -29,6 +29,32 @@ def task_yaml(task):
 
 
 class LocalDelegationTests(unittest.TestCase):
+    def test_adaptive_routing_keeps_explicit_approval_requirement(self):
+        self.task["execution"]["mode"] = "approval_required"
+        self.task["planning"].update(work_type="semantic", judgment="high")
+        result = d.route(self.task)
+        self.assertEqual(result["backend"], "direct")
+        self.assertEqual(result["mode"], "approval_required")
+
+    def test_verify_timeout_short_circuits_later_gate(self):
+        slow = f'"{sys.executable}" -c "import time; time.sleep(20)"'
+        self.task["checks"].update(adversarial_probes=[], fast_gate=[{"command": slow}],
+                                   final_gate=[{"command": f'"{sys.executable}" -c "print(123)"'}], required=[])
+        self.write_task(); self.commit()
+        record = self.prepare()
+        wt = Path(record["worktree"])
+        target = wt / "src/result.txt"; target.parent.mkdir(parents=True); target.write_text("x")
+        d.git(wt, "add", "src/result.txt"); d.git(wt, "commit", "-m", "implementation")
+        receipt_path = wt / ".ai/runtime/delegation/receipt.executor.yaml"
+        receipt = d.read_yaml(receipt_path); receipt.update(executor="antigravity", status="IMPLEMENTED")
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        run = json.loads(run_path.read_text(encoding="utf-8")); run["phase"] = "AWAITING_VERIFICATION"; d.save(run_path, run)
+        result = d.verify(self.root, "TASK-TEST", True, timeout=1, approval=self.approval())
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["commands"][0]["exit_code"], 124)
+        self.assertEqual(result["commands"][1]["result"], "NOT_RUN")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="local delegation ")
         self.root = Path(self.temp.name).resolve()

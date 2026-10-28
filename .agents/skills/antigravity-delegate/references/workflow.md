@@ -1,112 +1,98 @@
-# 统一控制流程
+# 高级任务控制流程
 
-## 角色
+普通有界机械修改先用[日常 run](quick-start.md)。本页适用于持久任务、审批、多轮返工和独立审查。
+已有受控任务不能改走 run 绕过审批或尝试预算。参数见[命令参考](cli.md)。
 
-- Codex Root（默认 Sol high）：唯一负责需求、架构、任务契约、路由、集成和最终验收。
-- 原生 Luna high：有界只读探索、调研、独立测试和审查；worker 仅作显式故障回退。
-- 独立 Reviewer（默认 Luna high）：返回发现与验收建议，由 Sol Root 复核并记录治理文件。
-- Antigravity / Gemini：在 Worktree 中完成受限实现并生成执行证据。
-- Human：高风险审批和最终合并。
+## 1. 规划与自适应路由
 
-## 1. 规划
+Root 定义目标、范围、验收、风险、检查和真实角色，执行者实现，独立审查者核验同一快照。
+在目标 Git 根目录 init 后创建草稿：
 
-建立最小可独立验收的任务，定义范围、风险、验收证据、检查命令和 execution.mode。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode delegated
+```
 
-    python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode direct
-    # 补齐范围、验收条件和检查命令后再验证
-    python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
-    python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+补齐 queue/TASK-001 的七文件契约，检查 planning.work_type、judgment、context_continuity、
+acceptance_determinism。默认只将低判断、可确定验收的机械工作交给 agy；语义、安全、架构、
+高判断、强连续性或低验收确定性的工作默认 direct。风险和 authority 另决定是否需要审批。
 
-## 2. 执行
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-001
+python .agents/skills/antigravity-delegate/scripts/control.py route TASK-001
+```
 
-使用 `create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode direct`
-自动生成七个任务文件及身份，不覆盖已有任务。补齐范围、验收、检查、实际角色和基线；
-初始验收列表为空，会被 validate/start 拒绝。YAML 结构化写入可能规范化注释和格式，
-重复键会被拒绝。
+按 route 的 backend 决定 start 或 prepare，不只看原 execution.mode。
+若 backend 变为 direct，先将 roles.executor 等身份规划改为实际执行者，并重新核对契约和审批。
+直接后端不会降低任务显式要求的审批。高判断任务强制委派需结构化 routing_override 和独立契约审批。
 
-start --worktree、worktree-create 和 prepare 前提交完整契约及预期修改，保持主控工作区
-干净，配置的基线必须等于当前 HEAD。基线不存在、落后或 direct 分支已存在时会报错。
+checks 可分 adversarial_probes、fast_gate、final_gate；旧 checks.required 兼容为末尾必要检查。
+创建草稿的验收与检查为空，需补齐后才能验证。命令按首次出现的字符串去重执行。
 
-- direct：Root、人工或经 Sol Root 明确批准的原生 Codex worker 在契约范围内实现。
-- delegated：本地 agy 在准备好的任务 Worktree 中实现。
-- approval_required：先将人工审批绑定到契约，再执行本地委派。
+## 2. 提交执行基线
 
-    python .agents/skills/antigravity-delegate/scripts/control.py start TASK-001 --worktree
-    python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
-    python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
-    python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
-    python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
+创建工作树前提交完整契约及预期修改，保持主控干净。isolation.base_branch 必须解析到包含
+契约的当前 HEAD，可用 HEAD；不要沿用过期 main。执行工作树只持有已提交契约快照，
+主控任务目录才拥有活动状态。一个工作树同时只允许一个写入者。
 
-Executor 只能修改可写范围，运行编码所需的 focused checks，提交实现并写 IMPLEMENTED
-回执，不得自我批准或合并。控制器 verify 运行权威检查矩阵并补充命令/工作区证据。
-Print 模式命令工作流优先采用有界同步执行，在 Windows 上搜索使用工作区 cwd 相对路径避免绝对盘符路径解析异常；
-异步/后台命令必须使用实际返回句柄进行主动轮询（TaskId 通过 manage_task status 轮询至 DONE/FAILED，
-CommandId 通过 command_status 轮询），严禁被动文本叙述等待、wait 定时器或 schedule 替代。
-能力门控的 stream-json 捕获工具启动/完成、句柄、结果与时间戳，不将进程退出码 0 或文本响应视作任务 PASS；
-原始事件日志保持可审计并具备显式降级回退，默认不禁用 slash commands。
-自修复范围豁免严格限于受批准任务版本、主控仓库、有效前置审批与指定的 7 个 .agents 路径，显式 protected 规则永远优先。
+## 3A. direct
 
-原生代理由 Root 通过真实派发启动，必须指定 Worktree、契约、文件归属和回执路径。
-Luna worker 不得作为 delegated 的中转或默认实现者；agy 不可用时，Root 必须先记录
-原因并批准切换为 direct，才能派发原生实现。
-Root 显式检查范围与证据后迁入 REVIEW，不对原生任务运行 agy 的 collect。
-合计并发和版本交接见 [混合执行](orchestration.md)。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py start TASK-001 --worktree
+```
 
-两条路径的活动状态都归主控仓库。生命周期命令在主控运行，也可指定
-`control.py --repo <主控路径>`；Worktree 内任务文件只是已提交快照。
-direct/native worker 返回证据，由 Root 写到 start 输出的主控回执路径，不修改
-Worktree 内的任务状态。Root 核实同一快照的范围、变更和测试后显式执行
-`transition TASK-001 REVIEW`。`status TASK-001` 显示主控状态及存在的 agy 运行记录。
+适用时加 --approval-file PATH。start 检查依赖、隔离和实际路由，可由 Root、人工或明确获准的
+原生 worker 实现；不要求先发生 agy 故障。中高风险及契约要求隔离时不能省略工作树。
+将真实证据交回 start 输出的主控回执路径，Root 检查后显式迁入 REVIEW：
 
-direct/manual 的受控任务使用 `start --approval-file PATH` 绑定当前契约审批；start
-还检查依赖和隔离要求。agy 写入其 Worktree 的 `.ai/runtime/delegation/receipt.executor.yaml`，
-由 collect 验证并收集到主控任务目录。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py transition TASK-001 REVIEW
+```
 
-## 3. 审查
+direct 不运行 agy 的 launch、verify、collect。实际代理身份未知时写 UNKNOWN，不以模板名冒充。
 
-Codex 独立阅读契约、精确 Diff、Executor Receipt、测试证据、架构和 ADR。
-允许的结论是 PASS、PASS_WITH_NOTES、REWORK、BLOCKED。
+## 3B. 本地 agy
 
-Review 不应悄悄修改实现。REWORK 必须记录具体问题并保留之前的尝试证据。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py probe
+python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
+python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
+```
 
-agy 完全退出后才启动 Luna tester/reviewer。只读 Reviewer 返回结果，由 Sol Root
-写 QA/Review 并作最终决定。测试和审查必须针对同一快照，
-包括未提交修改与新增文件；修复后必须重新验证受影响的证据。
+prepare 的路由或风险要求审批时也需 --approval-file PATH。verify 始终要求 --approve 和绑定
+当前契约的独立审批文件，因为它要执行确切的检查矩阵。两个 --approve 都不能替代审批 YAML。
 
-DONE 校验 COMPLETE 执行回执、REVIEWED QA、独立真实身份、任务/版本/尝试绑定、
-全部必要命令和验收证据、QA 风险/范围检查、一致的结论和摘要。除与 task.checks.optional
-完全匹配且注明非空理由的结构化 NOT_RUN 可选检查外，未验证事项和架构偏离阻止完成；
-存在已知问题时，必须有一对一独立 QA 处置（known_issues_review，禁止使用别名）、已检查证据、风险责任人结构化批准接受残余风险（approved_by/result: APPROVED/evidence，禁止纯字符串），
-且 QA/Review 结论一致为 PASS_WITH_NOTES。中高风险还要求回归 PASS。启用的控制要求跨家族 PASS 或有记录的人工豁免、
-有姓名和时间的合并审批、非空回滚计划。Root 仍需核实真实证据、豁免权限、回滚内容和
-实现快照，结构化回执校验不能替代这些判断。
+agy 只实现、运行必要聚焦检查、提交实现并写 IMPLEMENTED 回执，然后退出。
+verify 在工作树运行 adversarial → fast → final 检查，记录实际命令和工作区证据，
+全部通过才转为 COMPLETE；失败后续阶段标 NOT_RUN，之后由 collect 核验并进入 REVIEW 或阻塞。
+collect 不自动独立审查或 DONE。旧契约的兼容规则见[回执协议](receipt-protocol.md)。
 
-## 4. 收尾
+检查默认 argv，shell:true 需在获批契约中明确声明。单命令默认 600 秒、总检查默认 1800 秒，
+由共享进程模块执行及超时清理，并逐条复核分支、HEAD 和工作区。工作树不是操作系统沙箱。
+终端授权问题使用真实交互模式处理，不静默启用 --auto-approve；--full-access 只是旧兼容名。
 
-QA、Review 和 Risk Gate 全部通过后：
+## 4. 独立审查与收尾
 
-    python .agents/skills/antigravity-delegate/scripts/control.py transition TASK-001 DONE
+实现和验证退出后，再核验同一 HEAD、未提交 Diff、新增文件、命令与验收条件。
+审查者只返回发现和建议，Root 写主控 QA/Review；后续修改须重新验证受影响证据。
+有已知问题时须逐项处置和风险接受。DONE 的结构化门见[回执协议](receipt-protocol.md)。
 
-同步项目状态，保留证据，并明确合并已 Review 的提交。
-REWORK 只执行一次 REVIEW 到 READY，控制器自动归档并增加 attempt。
-再次使用 direct Worktree 时选择新契约分支，检查后保留或显式清理原干净工作区。
+```powershell
+python .agents/skills/antigravity-delegate/scripts/control.py transition TASK-001 DONE
+```
 
-## 恢复
+DONE 不合并 Git。人工处理已审查快照的合并与工作树收尾。
+PROJECT_STATE.yaml 仍为人工摘要，实时持久任务总览使用 status --json。
 
-新会话依次读取项目状态、任务目录、回执、Review、Git Worktree、ADR 和本地运行记录。
-安全恢复不依赖原始聊天记录。
+## 5. 返工与恢复
 
-旧版 direct 可能只在任务分支保存 active 状态。比较版本、attempt 和 Git Diff，保留
-回执，再协调为主控内唯一任务目录。不要合并出重复目录或在活动未知时重派执行器。
-runtime 日志属于恢复证据，清理前核实所属运行及 Worktree。
+REVIEW → READY 归档旧证据并增加 task attempt。实现返工与基础设施重试使用独立预算；
+旧 max_execution_attempts 继续按兼容逻辑工作，不能删除历史重置预算。
+incremental 上下文优先提供上一轮 Review、失败和 Diff，避免重复灌入全部历史。
 
-## 旧模板迁移
-
-V1 布局的项目规格从 `.ai/*.md` 移到 `.ai/project/`；未完成的
-`.ai/tasks/TASK-ID.md` 改为从 `.ai/templates/task/` 创建的任务文件夹，包含
-task.yaml、brief、context、回执、review 和 rollback。放入对应状态目录并同步
-PROJECT_STATE.yaml。保留已接受 ADR 和已归档报告，不重写历史证据。
-
-派发前执行 `python .agents/skills/antigravity-delegate/scripts/control.py validate TASK-ID`；中高风险使用
-Worktree。根 `.gitignore` 已排除 `.worktrees/` 和 `.ai/runtime/`，无需额外片段。
-当前 schema v2 任务无需为混合路由做结构迁移；新模板使用 Plus 偏好，历史身份仍有效。
+受控 partial 复用需精确清单、旧/新契约与 Diff 绑定审批，以及已退出进程的确认。
+--reuse-terminal-worktree 与 --reuse-tracked-worktree 的条件不同，不能凭文件夹还在就直接重用。
+详细结构与限制见[本地委派](delegation.md)、[任务协议](task-protocol.md)和[故障恢复](failure-recovery.md)。
+收到“继续”先检查现有主控任务、回执、Git、运行记录和实际进程，不重复成功启动。
+原生代理继承父会话权限，“不编辑”的角色指令不是独立只读系统权限；不能以配置 PASS 宣称运行保障。

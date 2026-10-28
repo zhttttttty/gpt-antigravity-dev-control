@@ -1,5 +1,10 @@
 # 故障恢复
 
+日常 run 先读取 result_file、工作树和检查日志；其 CHECK_FAILED/BLOCKED 不进入下面的持久队列。
+检查默认 argv，管道等语法需要 --shell-checks；超时后先核对实际进程，再决定重试或清理。
+完整工作流中的 verify 失败不自动重新实现；基础设施重试和实现返工预算分别记录。
+配置检查指出代理 sandbox_mode 等字段无效时，应核对父会话权限，而不是换一个字段值宣称只读保障。
+
 ## Windows 路径与只读前检
 
 初始化和 prepare 前，对照 PowerShell Resolve-Path、Python os.getcwd()/Path.resolve()

@@ -1,18 +1,22 @@
 # 原生 Codex 与本地 Antigravity 编排
 
+本页为高级流程，日常 run 不要求配置多角色，也不增加原生中转代理。
+原生子代理继承父会话权限、Provider 和 MCP；“不编辑”的角色指令不是单独的只读系统沙箱。
+
 一个 Root 负责路由、契约、容量和集成。`.ai/` 是规范来源；
 `.codex/` 模型默认值不授予权限，也不替代风险门。
 
 默认角色为 Sol high Root、Luna high explorer/researcher/tester/reviewer，以及本地
 Antigravity 实现者。Sol 是唯一规划、架构和最终验收决策者；Luna 返回事实、测试证据
-和审查建议；agy 是 delegated/approval_required 的唯一写入者。
+和审查建议；实际写入者以自适应 route 的 backend 为准。
 
 ## 选择执行者
 
 - Root 直接执行：局部小修改、需要高判断力的正确性/安全审查、微妙语言运行时语义，
   或协调成本大于收益的任务，仍保留必要独立审查。
 - 原生 Codex：Luna high explorer/researcher 收集事实，tester 独立验证，reviewer
-  返回发现。worker 仅是 agy 不可用后的显式回退。使用真实 `spawn_agent` 并保留返回身份。
+  返回发现。worker 可在 Root 明确选择并授权 direct 后承担有界实现，不限于 agy 故障回退。
+  使用真实 `spawn_agent` 并保留返回身份。
 - 本地 Antigravity：判断强度低、具有可执行验收条件、值得承担准备和隔离成本的有界实现、测试补充、
   样板代码或机械重构。其只读审查适合作为首轮扫描，不作为最终 PASS 来源。
   先探测 agy，再执行 prepare/launch/verify/collect 和审批流程。
@@ -22,8 +26,8 @@ Antigravity 实现者。Sol 是唯一规划、架构和最终验收决策者；L
 验收默认 direct。`approval_required` 是审批门，不代表 Antigravity 自动成为写入者；
 高判断任务强制委派须有结构化 routing override 的批准人与证据。
 
-原生实现使用 `execution.mode: direct`，`roles.executor` 填 worker 等实际角色；切换前
-必须记录 agy 不可用或不适用的原因，并由 Sol Root 明确批准，不能静默降级。
+原生实现使用 direct backend，`roles.executor` 填 worker 等实际角色；Root 需根据任务判断和上下文
+明确选择 direct，不静默切换后端，也不以固定模板名代替真实身份。
 direct 不启用 `execution.adapter: antigravity_cli`。需隔离时先运行
 `control.py start TASK --worktree`，将返回且核实的 Worktree 交给原生代理。
 控制器不自动派发原生代理或收集其回执，由 Root 核验范围与必要证据后请求迁入 REVIEW。

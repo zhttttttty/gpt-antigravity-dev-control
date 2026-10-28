@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import shutil
 import subprocess
 import sys
@@ -10,7 +11,7 @@ from pathlib import Path
 
 from task_data import (CHECK_STAGES, implementation_attempt_limit, read_yaml,
                        write_yaml, parse_yaml, task_id as checked_id,
-                       done_errors, require_approval, required_check_items)
+                       done_errors, require_approval, required_check_items, route_task)
 
 STATES = {
     "READY": ".ai/tasks/queue",
@@ -351,7 +352,8 @@ def start(root, task_id, with_worktree, approval=None):
         raise SystemExit(2)
     task = read_yaml(folder / "task.yaml")
     mode = task.get("execution", {}).get("mode", "direct")
-    if mode == "delegated":
+    routing = route_task(task)
+    if routing["backend"] != "direct":
         raise ValueError("Delegated task: use prepare instead of start")
     for dependency in task["planning"].get("depends_on", []):
         dep_state, _ = find_task(root, dependency)
@@ -399,11 +401,34 @@ def create(root, ident, title, objective, risk="low", mode="direct"):
     return folder
 
 
-def status(root):
+def status(root, json_output=False):
+    tasks = {}
+    seen = set()
     for state, rel in STATES.items():
         base = root / rel
-        tasks = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
-        print(f"{state:12} {', '.join(tasks) if tasks else '-'}")
+        tasks[state] = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
+        if json_output:
+            for ident in tasks[state]:
+                checked_id(ident)
+                if ident in seen:
+                    raise ValueError(f"Task exists in multiple state folders: {ident}")
+                seen.add(ident)
+                data = read_yaml(base / ident / "task.yaml")
+                if data.get("id") != ident or data.get("status") != state:
+                    raise ValueError(f"Task identity/folder/status mismatch: {base / ident}")
+    if json_output:
+        print(json.dumps({
+            "schema_version": 1,
+            "repository": str(root),
+            "tasks": tasks,
+            "counts": {state: len(ids) for state, ids in tasks.items()},
+            "in_progress_tasks": tasks["IN_PROGRESS"],
+            "unfinished_tasks": sorted(ident for state, ids in tasks.items()
+                                       if state not in {"DONE", "ARCHIVED"} for ident in ids),
+        }, ensure_ascii=False, indent=2))
+    else:
+        for state, ids in tasks.items():
+            print(f"{state:12} {', '.join(ids) if ids else '-'}")
 
 
 def main():
@@ -419,7 +444,8 @@ def main():
     p.add_argument("--approval-file")
     p = sub.add_parser("worktree-create"); p.add_argument("task_id")
     p = sub.add_parser("worktree-remove"); p.add_argument("task_id"); p.add_argument("--force", action="store_true")
-    sub.add_parser("status")
+    p = sub.add_parser("status")
+    p.add_argument("--json", action="store_true", help="Read live task directories without modifying project summary")
     ns = ap.parse_args()
     root = repo_root()
     if ns.cmd == "validate":
@@ -429,7 +455,7 @@ def main():
     elif ns.cmd == "start": start(root, ns.task_id, ns.worktree, ns.approval_file)
     elif ns.cmd == "worktree-create": worktree_create(root, ns.task_id)
     elif ns.cmd == "worktree-remove": worktree_remove(root, ns.task_id, ns.force)
-    elif ns.cmd == "status": status(root)
+    elif ns.cmd == "status": status(root, ns.json)
     return 0
 
 

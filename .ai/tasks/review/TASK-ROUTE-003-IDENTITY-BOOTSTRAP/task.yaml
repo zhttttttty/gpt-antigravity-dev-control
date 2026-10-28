@@ -1,0 +1,80 @@
+schema_version: 2
+id: TASK-ROUTE-003-IDENTITY-BOOTSTRAP
+title: Controller repository identity bootstrap
+status: REVIEW
+contract_revision: 1
+attempt: 1
+execution:
+  mode: direct
+  adapter: antigravity_cli
+  model: configured_default
+  context_budget: compact
+  report_level: summary
+  max_execution_attempts: 2
+  escalation: codex_review
+planning:
+  milestone: M1
+  epic: EPIC-001
+  requirements:
+  - FR-001
+  depends_on: []
+  risk: high
+roles:
+  planner: gpt-5.6-sol
+  executor: codex
+  reviewer: gpt-5.6-luna
+objective: Fail closed on spoofed controller repository identity without changing
+  executor evidence
+scope:
+  writable:
+  - .agents/skills/antigravity-delegate/scripts/delegate.py
+  - tests/test_local_delegation.py
+  protected:
+  - .ai/project/ARCHITECTURE.md
+  - migrations/**
+  out_of_scope:
+  - Only Root identity bootstrap approved by Sol under existing user route-repair
+    authority. No receipt rewriting, parser/risk changes, CLI permissions, business
+    edits, merge or push.
+authority:
+  architecture_change: false
+  database_schema_change: false
+  public_api_change: false
+  auth_security_change: true
+  major_dependency_change: false
+  deployment_change: false
+isolation:
+  worktree: true
+  base_branch: ai/route-identity-bootstrap-baseline
+  branch: ai/TASK-ROUTE-003-IDENTITY-BOOTSTRAP
+acceptance:
+- id: AC-I001
+  criterion: Identity requires exact Git top-level, same canonical Git common-dir
+    as executing controller, and trusted controller anchor ancestor; errors fail closed.
+  evidence: Normal controller and own worktree positive; same-name non-Git, fake git-init,
+    foreign common-dir and missing-anchor negatives.
+- id: AC-I002
+  criterion: Original e553b323 executor snapshot and receipt remain untouched; scope
+    protection and approval gates remain unchanged.
+  evidence: Exact two-file diff and independent Luna review.
+checks:
+  required:
+  - command: python -m unittest discover -s tests -v
+  - command: python -m compileall -q .agents/skills/antigravity-delegate/scripts tests
+  - command: git diff --check ai/route-identity-bootstrap-baseline...HEAD
+  optional: []
+risk_controls:
+  rollback_plan_required: true
+  cross_family_review_required: true
+  human_merge_approval_required: true
+artifacts:
+  brief: brief.md
+  context: context.md
+  executor_receipt: receipt.executor.yaml
+  qa_receipt: receipt.qa.yaml
+  review: review.yaml
+  rollback: rollback.md
+metadata:
+  created_at: '2026-09-16T12:14:08+00:00'
+  updated_at: '2026-09-16T12:17:21+00:00'
+  created_by: gpt-5.6-sol

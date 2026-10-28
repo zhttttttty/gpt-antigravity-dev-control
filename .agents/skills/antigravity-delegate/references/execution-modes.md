@@ -27,7 +27,7 @@ verify 在同一 Worktree 中运行契约声明的命令，依次处理 `adversa
 所有 verify 都须收到 contract-bound `--approval-file`，审批的是当前契约中的确切命令矩阵。
 check 默认按 argv、`shell: false` 执行；只有契约显式写 `shell: true` 时才调用 shell。
 每条命令有超时，整组有总 deadline；
-超时会清理进程树，每条命令后重新核验 branch、HEAD 和干净 Worktree。
+超时尝试清理进程树，每条命令后重新核验 branch、HEAD 和干净 Worktree；该机制不是操作系统沙箱。
 
 ## 本地能力映射
 

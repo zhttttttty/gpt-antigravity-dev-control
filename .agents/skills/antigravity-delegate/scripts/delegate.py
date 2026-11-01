@@ -17,7 +17,7 @@ import time
 
 import yaml
 import ai
-from process_utils import run_command
+from process_utils import run_command, split_command
 from task_data import (CHECK_STAGES, digest, evidence_counts,
                        implementation_attempt_limit, read_yaml,
                        required_check_items, require_approval, route_task, task_id,
@@ -433,6 +433,26 @@ def _staged_checks(task):
     return out
 
 
+def _validate_check_matrix(staged, timeout):
+    """Reject malformed later commands before running the first command."""
+    seen = {}
+    for _, item in staged:
+        command = item["command"]
+        seconds = item.get("timeout_seconds", timeout)
+        if type(seconds) is not int or seconds <= 0:
+            raise ValueError(f"Invalid timeout_seconds for check: {command}")
+        if "shell" in item and type(item["shell"]) is not bool:
+            raise ValueError("Check shell must be boolean")
+        if item.get("shell") is not True:
+            split_command(command)
+        elif "\0" in command:
+            raise ValueError("Check command must contain no NUL")
+        signature = (item.get("shell", False), seconds)
+        if command in seen and seen[command] != signature:
+            raise ValueError(f"Duplicate check has conflicting shell or timeout: {command}")
+        seen[command] = signature
+
+
 def _utc_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -498,8 +518,13 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
 
     staged = _staged_checks(task)
     require_approval(task, ident, approval)
+    _validate_check_matrix([(stage, item) for stage in (*CHECK_STAGES, "required")
+                            for item in task.get("checks", {}).get(stage, [])], timeout)
     verify_dir = path.parent / "verify"
     verify_dir.mkdir(exist_ok=False)
+    record.update(phase="VERIFYING", verification={"head_commit": head,
+                  "directory": str(verify_dir), "status": "RUNNING"})
+    save(path, record)
     results = []
     failed = bool(violations)
     verify_started = time.monotonic()
@@ -529,16 +554,22 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
             continue
         effective_timeout = min(command_timeout, remaining)
         use_shell = item.get("shell") is True
-        check_result = run_command(command, cwd=worktree, log=log_path,
-                                   timeout=effective_timeout, shell=use_shell)
+        try:
+            check_result = run_command(command, cwd=worktree, log=log_path,
+                                       timeout=effective_timeout, shell=use_shell)
+        except (ValueError, OSError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
+            check_result = {"exit_code": 125, "error": str(exc) or "Verification interrupted"}
         exit_code = check_result["exit_code"]
         workspace_reason = None
-        if git(worktree, "branch", "--show-current") != record["branch"]:
-            workspace_reason = "verification command changed branch"
-        elif git(worktree, "rev-parse", "HEAD") != head:
-            workspace_reason = "verification command changed HEAD"
-        elif git(worktree, "status", "--porcelain"):
-            workspace_reason = "verification command dirtied worktree"
+        try:
+            if git(worktree, "branch", "--show-current") != record["branch"]:
+                workspace_reason = "verification command changed branch"
+            elif git(worktree, "rev-parse", "HEAD") != head:
+                workspace_reason = "verification command changed HEAD"
+            elif git(worktree, "status", "--porcelain"):
+                workspace_reason = "verification command dirtied worktree"
+        except (OSError, subprocess.SubprocessError) as exc:
+            workspace_reason = f"verification workspace cannot be inspected: {exc}"
         if workspace_reason:
             exit_code = exit_code if exit_code != 0 else 125
         outcome = "PASS" if exit_code == 0 else "FAIL"
@@ -551,6 +582,7 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
         if workspace_reason:
             result["reason"] = workspace_reason
         results.append(result)
+        save(verify_dir / "progress.json", {"head_commit": head, "commands": results})
         if outcome == "FAIL":
             failed = True
 
@@ -566,11 +598,14 @@ def verify(root, ident, approved=False, timeout=600, total_timeout=1800, approva
     if not receipt.get("started_at"):
         receipt["started_at"] = _utc_now()
     write_yaml(receipt_path, receipt)
+    atomic(verify_dir / "receipt.executor.yaml", receipt_path.read_text(encoding="utf-8"))
     record.update(
         phase="VERIFICATION_FAILED" if failed else "VERIFIED",
         verification={
             "status": "FAIL" if failed else "PASS", "commands": len(results),
             "violations": violations, "directory": str(verify_dir),
+            "head_commit": head,
+            "receipt_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
         },
     )
     save(path, record)
@@ -699,6 +734,12 @@ def collect(root, ident):
     files = sorted(filter(None, names.split("\0")))
     violations = scope_violations(files, task, root=root, pre_review=record.get("pre_review"))
     receipt_path = worktree / ".ai/runtime/delegation/receipt.executor.yaml"
+    if record["phase"] in {"VERIFIED", "VERIFICATION_FAILED"}:
+        verified = record.get("verification", {})
+        if verified.get("head_commit") != head:
+            raise ValueError("Verified snapshot changed or lacks a seal; use a reviewed new attempt, not stale verification")
+        if verified.get("receipt_sha256") != hashlib.sha256(receipt_path.read_bytes()).hexdigest():
+            raise ValueError("Verified receipt changed; inspect the controller copy before a new attempt")
     receipt = read_yaml(receipt_path)
     if any(receipt.get(k) != v for k, v in {"task_id": ident, "attempt": task["attempt"],
                                            "contract_revision": task["contract_revision"], "schema_version": 2}.items()):

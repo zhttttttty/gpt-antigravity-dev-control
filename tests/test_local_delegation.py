@@ -29,6 +29,70 @@ def task_yaml(task):
 
 
 class LocalDelegationTests(unittest.TestCase):
+    def ready_for_verification(self, commands=None):
+        command = f'"{sys.executable}" -c "print(123)"'
+        self.task["checks"].update(required=commands or [{"command": command}],
+                                   adversarial_probes=[], fast_gate=[], final_gate=[])
+        self.write_task(); self.commit()
+        record = self.prepare()
+        receipt_path = self.finish(record)
+        receipt = d.read_yaml(receipt_path)
+        receipt.update(status="IMPLEMENTED", executor="antigravity")
+        d.write_yaml(receipt_path, receipt)
+        run_path = Path(record["run_dir"]) / "run.json"
+        record["phase"] = "AWAITING_VERIFICATION"
+        d.save(run_path, record)
+        return record, receipt_path
+
+    def test_collect_rejects_changed_head_even_with_forged_receipt(self):
+        record, receipt_path = self.ready_for_verification()
+        d.verify(self.root, "TASK-TEST", True, approval=self.approval())
+        wt = Path(record["worktree"])
+        (wt / "src/result.txt").write_text("changed after verification")
+        d.git(wt, "add", "."); d.git(wt, "commit", "-m", "unverified edit")
+        receipt = d.read_yaml(receipt_path)
+        receipt["workspace"]["head_commit"] = d.git(wt, "rev-parse", "HEAD")
+        d.write_yaml(receipt_path, receipt)
+        with self.assertRaisesRegex(ValueError, "Verified snapshot changed"):
+            self.collect()
+        self.assertEqual(d.ai.find_task(self.root, "TASK-TEST")[0], "IN_PROGRESS")
+
+    def test_collect_rejects_changed_verification_receipt(self):
+        record, receipt_path = self.ready_for_verification()
+        d.verify(self.root, "TASK-TEST", True, approval=self.approval())
+        self.assertTrue((Path(record["run_dir"]) / "verify/receipt.executor.yaml").is_file())
+        receipt = d.read_yaml(receipt_path)
+        receipt["acceptance_evidence"][0]["evidence"] = "unverified replacement"
+        d.write_yaml(receipt_path, receipt)
+        with self.assertRaisesRegex(ValueError, "Verified receipt changed"):
+            self.collect()
+
+    def test_verify_preflights_later_shell_error_without_running_earlier_check(self):
+        commands = [{"command": f'"{sys.executable}" -c "print(123)"'},
+                    {"command": "echo one && echo two"}]
+        record, _ = self.ready_for_verification(commands)
+        with self.assertRaisesRegex(ValueError, "explicit shell"):
+            d.verify(self.root, "TASK-TEST", True, approval=self.approval())
+        self.assertFalse((Path(record["run_dir"]) / "verify").exists())
+        self.assertEqual(d.latest(self.root, "TASK-TEST")[1]["phase"], "AWAITING_VERIFICATION")
+
+    def test_verify_rejects_conflicting_duplicate_command_policy(self):
+        command = f'"{sys.executable}" -c "print(123)"'
+        record, _ = self.ready_for_verification([
+            {"command": command}, {"command": command, "shell": True}])
+        with self.assertRaisesRegex(ValueError, "conflicting shell or timeout"):
+            d.verify(self.root, "TASK-TEST", True, approval=self.approval())
+        self.assertFalse((Path(record["run_dir"]) / "verify").exists())
+
+    def test_verify_internal_check_failure_retains_failed_evidence(self):
+        record, receipt_path = self.ready_for_verification()
+        with patch.object(d, "run_command", side_effect=OSError("log unavailable")):
+            result = d.verify(self.root, "TASK-TEST", True, approval=self.approval())
+        self.assertEqual(result["phase"], "VERIFICATION_FAILED")
+        self.assertIn("log unavailable", result["commands"][0]["reason"])
+        self.assertEqual(d.read_yaml(receipt_path)["status"], "FAILED")
+        self.assertTrue((Path(record["run_dir"]) / "verify/progress.json").is_file())
+
     def test_adaptive_routing_keeps_explicit_approval_requirement(self):
         self.task["execution"]["mode"] = "approval_required"
         self.task["planning"].update(work_type="semantic", judgment="high")
@@ -372,7 +436,8 @@ class LocalDelegationTests(unittest.TestCase):
         logs = self.root / ".ai/runtime/testlogs"; logs.mkdir(parents=True)
         adapter = AntigravityCLI(sys.executable, ["-c", "import time; time.sleep(2)"], .05)
         result = adapter.launch(self.root, self.root / "context", self.root / "receipt", logs)
-        self.assertIsNone(result["exit_code"])
+        self.assertEqual(result["exit_code"], 124)
+        self.assertTrue(result["timed_out"])
         self.assertEqual(result["completion"], "UNKNOWN")
         self.assertFalse(AntigravityCLI("missing-binary-237987").probe(logs)["available"])
 
@@ -677,16 +742,16 @@ class LocalDelegationTests(unittest.TestCase):
         adapter = AntigravityCLI(sys.executable, interactive=True)
         with patch('antigravity_cli.sys.stdin.isatty', return_value=True), \
              patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
-             patch('antigravity_cli.subprocess.run') as run:
+             patch('antigravity_cli.subprocess.run') as run, \
+             patch('antigravity_cli.run_command', return_value={"exit_code": 0}) as execute:
             run.return_value.returncode = 0
-            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n'
+            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n--add-dir PATH\n'
             result = adapter.launch(self.root, logs / "context.md", receipt, logs)
-        argv = run.call_args.args[0]
+        argv = execute.call_args.args[0]
         self.assertIn('-i', argv)
         self.assertIn('--add-dir', argv)
         self.assertNotIn('--dangerously-skip-permissions', argv)
-        self.assertNotIn('stdin', run.call_args.kwargs)
-        self.assertNotIn('stdout', run.call_args.kwargs)
+        self.assertTrue(execute.call_args.kwargs['interactive'])
         self.assertEqual(result['diagnostic'], 'RECEIPT_PRESENT_UNVERIFIED')
 
     def test_full_access_is_explicit_and_only_changes_argv(self):
@@ -695,11 +760,12 @@ class LocalDelegationTests(unittest.TestCase):
         adapter = AntigravityCLI(sys.executable, interactive=True, full_access=True)
         with patch('antigravity_cli.sys.stdin.isatty', return_value=True), \
              patch('antigravity_cli.sys.stdout.isatty', return_value=True), \
-             patch('antigravity_cli.subprocess.run') as run:
+             patch('antigravity_cli.subprocess.run') as run, \
+             patch('antigravity_cli.run_command', return_value={"exit_code": 0}) as execute:
             run.return_value.returncode = 0
-            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n'
+            run.return_value.stdout = '--mode Set mode (accept-edits, plan)\n--print Run a prompt\n-i Run interactive\n--dangerously-skip-permissions\n--add-dir PATH\n'
             adapter.launch(self.root, logs / "context.md", receipt, logs)
-        argv = run.call_args.args[0]
+        argv = execute.call_args.args[0]
         self.assertIn('--dangerously-skip-permissions', argv)
         self.assertIn('--add-dir', argv)
         self.assertNotIn('--sandbox', argv)
@@ -1203,7 +1269,13 @@ class LocalDelegationTests(unittest.TestCase):
             kwargs["stdout"].write(b'progress narration\n{"event":"result","result":{"status":"SUCCESS"}}\n')
             return type("Completed", (), {"returncode": 0})()
 
-        with patch("antigravity_cli.subprocess.run", side_effect=fake_run):
+        def execute(argv, **kwargs):
+            with kwargs["log"].open("wb") as stream:
+                fake_run(argv, stdout=stream)
+            return {"exit_code": 0}
+
+        with patch("antigravity_cli.subprocess.run", side_effect=fake_run), \
+             patch("antigravity_cli.run_command", side_effect=execute):
             result = adapter.launch(self.root, logs / "context.md", receipt, logs)
         self.assertEqual(result["output_format"], "INVALID")
         self.assertEqual(result["diagnostic"], "FORMAT_INVALID")
@@ -1222,7 +1294,13 @@ class LocalDelegationTests(unittest.TestCase):
             )
             return type("Completed", (), {"returncode": 0})()
 
-        with patch("antigravity_cli.subprocess.run", side_effect=fake_permission_run):
+        def permission_execute(argv, **kwargs):
+            with kwargs["log"].open("wb") as stream:
+                fake_permission_run(argv, stdout=stream)
+            return {"exit_code": 0}
+
+        with patch("antigravity_cli.subprocess.run", side_effect=fake_permission_run), \
+             patch("antigravity_cli.run_command", side_effect=permission_execute):
             permission_result = permission_adapter.launch(self.root, logs / "context.md", receipt, logs)
         self.assertEqual(permission_result["diagnostic"], "PERMISSION_BLOCKED")
         self.assertEqual(permission_result["secondary_diagnostic"], "FORMAT_INVALID")

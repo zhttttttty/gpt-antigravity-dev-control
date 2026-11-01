@@ -15,6 +15,21 @@ PROJECT_TEMPLATE = SKILL_ROOT / "templates" / "project"
 STATE_DIRS = ("queue", "active", "review", "blocked", "done", "archive")
 
 
+def safe_target(repo: Path, target: Path, *, directory=False) -> None:
+    for path in (target, *target.parents):
+        if path == repo:
+            break
+        attributes = getattr(path.lstat(), "st_file_attributes", 0) if path.exists() else 0
+        if path.is_symlink() or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0):
+            raise ValueError(f"Installation target must not traverse a link: {path}")
+        if path.exists():
+            needs_directory = path != target or directory
+            if needs_directory and not path.is_dir():
+                raise ValueError(f"Installation target is not a directory: {path}")
+            if not needs_directory and not path.is_file():
+                raise ValueError(f"Installation target is not a file: {path}")
+
+
 def profile_plan(repo: Path, overwrite: bool) -> list[tuple[Path, Path]]:
     """Preflight the entire profile before changing any target files."""
     source = SKILL_ROOT / "templates" / "codex"
@@ -26,14 +41,7 @@ def profile_plan(repo: Path, overwrite: bool) -> list[tuple[Path, Path]]:
     files.append((canonical, repo / ".ai/config.yaml"))
     conflicts = []
     for src, target in files:
-        for path in (target, *target.parents):
-            if path == repo:
-                break
-            attributes = getattr(path.lstat(), "st_file_attributes", 0) if path.exists() else 0
-            if path.is_symlink() or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0):
-                raise ValueError(f"Profile target must not traverse a link: {path}")
-            if path.exists() and path != target and not path.is_dir():
-                raise ValueError(f"Profile parent is not a directory: {path}")
+        safe_target(repo, target)
         if target.exists():
             if not target.is_file():
                 raise ValueError(f"Profile target is not a file: {target}")
@@ -57,6 +65,18 @@ def init_project(repo: Path, install_codex_profile: bool = False,
     profile = profile_plan(repo, overwrite_codex_profile) if install_codex_profile else []
     ai = repo / ".ai"
     templates = ai / "templates" / "task"
+    # Preflight ordinary init as well as optional profiles; a linked .ai or
+    # .gitignore must never redirect initialization outside the chosen repo.
+    directories = [templates, ai / "runtime/logs", ai / "project", ai / "state"]
+    directories += [ai / "tasks" / state for state in STATE_DIRS]
+    files = [repo / ".gitignore", ai / "state/PROJECT_STATE.yaml"]
+    files += [directory / ".gitkeep" for directory in directories[4:]]
+    files += [templates / source.name for source in TASK_TEMPLATE.iterdir()]
+    files += [ai / "project" / source.name for source in PROJECT_TEMPLATE.iterdir()]
+    for directory in directories:
+        safe_target(repo, directory, directory=True)
+    for target in files:
+        safe_target(repo, target)
     templates.mkdir(parents=True, exist_ok=True)
     for state in STATE_DIRS:
         folder = ai / "tasks" / state

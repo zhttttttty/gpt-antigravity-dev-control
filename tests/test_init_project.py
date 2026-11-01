@@ -106,6 +106,26 @@ class ProjectInitializationTests(unittest.TestCase):
         self.assertEqual(list(Path(outside.name).iterdir()), [])
         self.assertFalse((self.project / ".ai").exists())
 
+    def test_plain_init_refuses_linked_state_before_writing(self):
+        outside = tempfile.TemporaryDirectory(prefix="external state ")
+        self.addCleanup(outside.cleanup)
+        try:
+            (self.project / ".ai").symlink_to(Path(outside.name), target_is_directory=True)
+        except OSError as exc:
+            self.skipTest(f"Directory symlinks unavailable: {exc}")
+        result = self.run_control("init")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must not traverse a link", result.stderr)
+        self.assertEqual(list(Path(outside.name).iterdir()), [])
+        self.assertFalse((self.project / ".gitignore").exists())
+
+    def test_plain_init_file_conflict_does_not_partially_initialize(self):
+        (self.project / ".gitignore").mkdir()
+        result = self.run_control("init")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not a file", result.stderr)
+        self.assertFalse((self.project / ".ai").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

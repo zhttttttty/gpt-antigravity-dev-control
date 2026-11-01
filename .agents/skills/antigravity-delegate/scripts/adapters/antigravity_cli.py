@@ -4,10 +4,10 @@ import shutil
 import subprocess
 import sys
 import re
-import time
 from pathlib import Path
 
 import yaml
+from process_utils import run_command
 
 
 class AntigravityCLI:
@@ -31,9 +31,12 @@ class AntigravityCLI:
             raise ValueError("Interactive launch uses managed arguments; --args-file is print-mode only")
         if self.args is None:
             capabilities = self.capabilities()
+            required = "interactive_arg" if self.interactive else "print_arg"
+            if not capabilities.get(required):
+                raise ValueError(f"CLI does not advertise {'interactive prompt mode' if self.interactive else '--print or -p'}")
             if self.full_access and not capabilities["permission_bypass"]:
                 raise ValueError("CLI does not advertise --dangerously-skip-permissions; refuse full-access launch")
-            if self.mode not in capabilities["mode_values"]:
+            if not capabilities["mode"] or self.mode not in capabilities["mode_values"]:
                 raise ValueError(
                     f"CLI does not advertise --mode {self.mode}; supported modes: "
                     f"{', '.join(capabilities['mode_values']) or 'unknown'}"
@@ -76,20 +79,26 @@ class AntigravityCLI:
             args = self.args
         else:
             capabilities = self.capabilities()
+            optional_args = []
+            if capabilities.get("add_dir"):
+                optional_args += ["--add-dir", "{worktree}"]
+            if capabilities.get("log_file"):
+                optional_args += ["--log-file", str(logs / "agy.log")]
             mode_args = ["--mode", self.mode] if capabilities["mode"] else []
             access_args = ["--dangerously-skip-permissions"] if self.full_access else []
             format_args = ["--output-format", "stream-json"] if (not self.interactive and capabilities.get("stream_json")) else []
             if self.interactive:
                 args = [
-                    "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
+                    *optional_args,
                     *mode_args, *access_args, capabilities["interactive_arg"], prompt,
                 ]
             else:
                 print_timeout_seconds = max(1, self.timeout - 5)
+                timeout_args = ["--print-timeout", f"{print_timeout_seconds}s"] if capabilities.get("print_timeout") else []
                 args = [
-                    "--add-dir", "{worktree}", "--log-file", str(logs / "agy.log"),
+                    *optional_args,
                     *format_args,
-                    *mode_args, *access_args, "--print-timeout", f"{print_timeout_seconds}s",
+                    *mode_args, *access_args, *timeout_args,
                     f"{capabilities['print_arg']}={prompt}",
                 ]
         if not isinstance(args, list) or not args or not all(isinstance(x, str) for x in args):
@@ -120,7 +129,11 @@ class AntigravityCLI:
         except (OSError, subprocess.SubprocessError) as exc:
             raise ValueError(f"Unable to inspect agy capabilities: {exc}") from exc
         help_text = completed.stdout or ""
-        mode_match = re.search(r"--mode\s+.*?\(([^)]*)\)", help_text, re.IGNORECASE | re.DOTALL)
+        if completed.returncode != 0:
+            raise ValueError(f"agy --help failed with exit code {completed.returncode}")
+        def has_flag(flag):
+            return re.search(r"(?<![\w-])" + re.escape(flag) + r"(?![\w-])", help_text) is not None
+        mode_match = re.search(r"--mode\b[^\r\n]*?\(([^)]*)\)", help_text, re.IGNORECASE)
         mode_values = []
         if mode_match:
             mode_values = [value.strip() for value in mode_match.group(1).split("|") if value.strip()]
@@ -128,18 +141,17 @@ class AntigravityCLI:
                 mode_values = [value.strip() for value in mode_match.group(1).split(",") if value.strip()]
         self._capabilities = {
             "help_exit_code": completed.returncode,
-            "permission_bypass": "--dangerously-skip-permissions" in help_text,
-            "sandbox": "--sandbox" in help_text,
-            "mode": "--mode" in help_text,
+            "permission_bypass": has_flag("--dangerously-skip-permissions"),
+            "sandbox": has_flag("--sandbox"),
+            "mode": has_flag("--mode"),
             "mode_values": mode_values,
             "stream_json": "--output-format" in help_text and "stream-json" in help_text,
-            "print_arg": "--print" if "--print" in help_text else "-p" if "-p" in help_text else None,
-            "interactive_arg": "--prompt-interactive" if "--prompt-interactive" in help_text else "-i" if "-i" in help_text else None,
+            "print_arg": "--print" if has_flag("--print") else "-p" if has_flag("-p") else None,
+            "interactive_arg": "--prompt-interactive" if has_flag("--prompt-interactive") else "-i" if has_flag("-i") else None,
+            "add_dir": has_flag("--add-dir"),
+            "log_file": has_flag("--log-file"),
+            "print_timeout": has_flag("--print-timeout"),
         }
-        if not self._capabilities["print_arg"]:
-            raise ValueError("CLI does not advertise --print or -p")
-        if not self._capabilities["interactive_arg"]:
-            raise ValueError("CLI does not advertise interactive prompt mode")
         return self._capabilities
 
     def probe(self, logs):
@@ -160,23 +172,13 @@ class AntigravityCLI:
                     results[name] = {"exit_code": cp.returncode, "log": str(path)}
                 except (OSError, subprocess.TimeoutExpired) as exc:
                     results[name] = {"error": str(exc), "log": str(path)}
-        agent_probes = {}
-        for name, probe_args in (("agent", ["agent"]), ("agents", ["agents"]), ("agent_list", ["agent", "list"])):
-            path = logs / f"{name}.log"
-            try:
-                with path.open("wb") as output:
-                    cp = subprocess.run([executable, *probe_args], stdout=output,
-                                        stderr=subprocess.STDOUT, timeout=15,
-                                        stdin=subprocess.DEVNULL, shell=False)
-                agent_probes[name] = {"exit_code": cp.returncode, "log": str(path)}
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                agent_probes[name] = {"error": str(exc), "log": str(path)}
         try:
             capabilities = self.capabilities()
         except ValueError as exc:
             capabilities = {"error": str(exc)}
-        return {"available": True, "executable": executable, "probes": results,
-                "agent_probes": agent_probes, "capabilities": capabilities,
+        return {"available": results["help"].get("exit_code") == 0,
+                "executable": executable, "probes": results,
+                "agent_probes": {}, "capabilities": capabilities,
                 "login": "UNKNOWN", "headless": "UNVERIFIED"}
 
     def launch(self, worktree, context, receipt, logs):
@@ -185,25 +187,16 @@ class AntigravityCLI:
         path = logs / "launch.log"
         result = {"exit_code": None, "log": str(path), "cli_log": str(logs / "agy.log"),
                   "mode": "interactive" if self.interactive else "print", "completion": "UNKNOWN"}
-        started = time.monotonic()
-        with path.open("wb") as output:
-            try:
-                if self.interactive:
-                    output.write(b"Interactive terminal output is not captured; see agy.log.\n")
-                    cp = subprocess.run(argv, cwd=worktree, shell=False, timeout=self.timeout)
-                else:
-                    cp = subprocess.run(argv, cwd=worktree, stdout=output,
-                                        stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                        shell=False, timeout=self.timeout)
-                result["exit_code"] = cp.returncode
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                result.update(error=str(exc), diagnostic="PROCESS_FAILED")
-            except KeyboardInterrupt:
-                result.update(error="Interactive session interrupted; inspect worktree before recovery",
-                              diagnostic="INTERRUPTED")
-        result["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        execution = run_command(argv, cwd=worktree, log=path, timeout=self.timeout,
+                                interactive=self.interactive)
+        result.update({key: value for key, value in execution.items() if key not in {"result", "shell"}})
+        if execution.get("interrupted"):
+            result["diagnostic"] = "INTERRUPTED"
+        elif execution["exit_code"] != 0:
+            result["diagnostic"] = "PROCESS_FAILED"
         result["output_bytes"] = path.stat().st_size if path.is_file() else 0
-        if not self.interactive and self.args is None and path.is_file():
+        expects_stream = not self.interactive and self.args is None and self.capabilities().get("stream_json")
+        if expects_stream and path.is_file():
             try:
                 events = parse_stream_events(path.read_text(encoding="utf-8", errors="replace"))
                 if events:
@@ -220,6 +213,9 @@ class AntigravityCLI:
             except Exception:
                 result["stream_events"] = "PARSE_ERROR"
                 result["output_format"] = "INVALID"
+        elif not self.interactive and self.args is None:
+            result["stream_events"] = "NOT_APPLICABLE"
+            result["output_format"] = "TEXT"
         else:
             result["stream_events"] = "NOT_APPLICABLE" if (self.interactive or self.args is not None) else "LOG_MISSING"
             result["output_format"] = "NOT_APPLICABLE" if (self.interactive or self.args is not None) else "MISSING"

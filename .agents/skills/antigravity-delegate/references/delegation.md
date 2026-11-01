@@ -5,23 +5,23 @@ Codex 在仓库内执行，不需要 Hermes、远程 Reviewer API 或后台调�
 
 ## 安装与探测
 
-本地 agy 生命周期需要 Python 3.10+ 和 Git；运行 check-orchestration 或完整项目
-测试集时使用 Python 3.11+。
+统一使用 Python 3.11+ 和 Git；首次使用或排障时先运行 doctor。
 
     python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
     python .agents/skills/antigravity-delegate/scripts/control.py --help
-    python .agents/skills/antigravity-delegate/scripts/control.py probe
+    python .agents/skills/antigravity-delegate/scripts/control.py doctor
 
 Windows 上 agy 不在 PATH 时：
 
     python .agents/skills/antigravity-delegate/scripts/control.py probe --executable C:\path\to\agy.exe
 
-探测会检查 `--version`、`--help`、`agent`、`agents` 和 `agent list`，并从帮助文本
+doctor 读取 `--help`；需要保存探测日志时使用 probe，仅检查 `--version`、`--help`，从帮助文本
 动态解析实际参数与模式。不要假设固定版本，也不要把控制器的 `direct` 当成 agy
 模式。真实登录、条款、隐私选项和文件夹信任需要在交互终端中完成。
 
-Adapter 默认从隔离 Worktree 运行，非交互模式使用 `-p <prompt>`，不会将 stdout
-当作 JSON；结构化结果必须写入回执文件。模型保持 agy 当前配置的默认值。
+Adapter 默认从隔离 Worktree 运行，非交互模式使用实际声明的 print 参数。
+CLI 支持 stream-json 时记录并校验事件，否则保留文本日志；业务结果仍以回执和实际验证为准。
+模型保持 agy 当前配置的默认值。
 探测成功不能证明认证和工具权限。自定义版本参数可用 `launch --args-file local-argv.json`
 传入 JSON 字符串数组，支持 `{worktree}`、`{context}`、`{receipt}` 占位符；
 参数直接传给进程，不经过 Shell。Windows 批处理包装器会被拒绝，应使用原生可执行文件。
@@ -31,7 +31,7 @@ Adapter 默认从隔离 Worktree 运行，非交互模式使用 `-p <prompt>`，
     python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive --executable /path/to/agy
 
 必须在真实终端中运行，不要重定向 stdin/stdout。启动后让 Executor 完成契约、测试
-和 receipt，然后退出 agy，回到 Codex 执行 collect。
+并写 IMPLEMENTED 回执，然后退出 agy，回到 Codex 执行 verify，再 collect。
 
 交互输出包含 TUI 和最终控制器 JSON，不是纯 JSON 流；终端画面不写入 launch.log，
 agy.log 可能含路径、Prompt 或私有代码，应只保存在本地并在外发前脱敏。

@@ -5,7 +5,7 @@
 本项目让 Codex 通过本地 agy 完成有界修改，默认使用一次 run 委派；需要审批和持久任务时再使用完整控制协议。
 主要交付物为 `.agents/skills/antigravity-delegate/`，包含统一 CLI、任务与回执模板、
 Antigravity CLI Adapter、PowerShell 多代理审阅脚本和操作说明。
-版本以仓库根目录 `VERSION` 为准，当前文件内容为 `3.5.0-local`。
+版本以仓库根目录 `VERSION` 为准，当前文件内容为 `3.6.0-local`。
 
 ## 要解决的问题
 

@@ -1,8 +1,12 @@
 # 故障恢复
 
 日常 run 先读取 result_file、工作树和检查日志；其 CHECK_FAILED/BLOCKED 不进入下面的持久队列。
+忘记结果路径时执行 `control.py runs latest` 或 `runs RUN-ID`；环境问题先 doctor。
 检查默认 argv，管道等语法需要 --shell-checks；超时后先核对实际进程，再决定重试或清理。
 完整工作流中的 verify 失败不自动重新实现；基础设施重试和实现返工预算分别记录。
+VERIFYING 表示尚无完整验证结论；意外退出后检查 verify/progress.json、运行日志和实际进程。
+不要直接重跑同一 verify 目录。新版本 collect 核对控制器保存的验证 HEAD 与回执哈希；
+快照变化或旧 VERIFIED 记录缺少绑定时，保留现场并按下述有界返工流程建立新尝试和验证证据。
 配置检查指出代理 sandbox_mode 等字段无效时，应核对父会话权限，而不是换一个字段值宣称只读保障。
 
 ## Windows 路径与只读前检

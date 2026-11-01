@@ -19,13 +19,36 @@ function Resolve-NativeExecutable([string]$Name) {
 }
 
 function Invoke-Probe([string]$Path, [string[]]$Arguments, [string]$LogPath) {
-    $savedPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    $text = (& $Path @Arguments 2>&1 | ForEach-Object {
-        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { $_.ToString() }
-    } | Out-String)
-    $ErrorActionPreference = $savedPreference
-    $exitCode = $LASTEXITCODE
+    if ($Arguments.Count -ne 1 -or $Arguments[0] -notin @('--help', '--version')) {
+        throw 'Probe accepts only --help or --version; never launch a prompt to inspect capabilities'
+    }
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo.FileName = $Path
+    $process.StartInfo.Arguments = $Arguments[0]
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.CreateNoWindow = $true
+    $process.StartInfo.RedirectStandardInput = $true
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    try {
+        if (-not $process.Start()) { throw 'Unable to start capability probe' }
+        $process.StandardInput.Close()
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $exitCode = 124
+        if ($process.WaitForExit(15000)) {
+            $exitCode = $process.ExitCode
+        } else {
+            & taskkill /PID $process.Id /T /F 2>&1 | Out-Null
+            if (-not $process.HasExited) { $process.Kill() }
+            $null = $process.WaitForExit(5000)
+        }
+        $text = if ($stdout.Wait(1000)) { $stdout.Result } else { '[stdout incomplete]' }
+        $text += if ($stderr.Wait(1000)) { $stderr.Result } else { '[stderr incomplete]' }
+        if ($exitCode -eq 124) { $text += "`nTIMEOUT: capability probe exceeded 15 seconds" }
+    } finally {
+        $process.Dispose()
+    }
     Set-Content -LiteralPath $LogPath -Value $text -Encoding UTF8
     return [ordered]@{
         arguments = $Arguments
@@ -42,9 +65,6 @@ try {
 
     $version = Invoke-Probe $path @("--version") (Join-Path $outDir "version.log")
     $help = Invoke-Probe $path @("--help") (Join-Path $outDir "help.log")
-    $agent = Invoke-Probe $path @("agent") (Join-Path $outDir "agent.log")
-    $agents = Invoke-Probe $path @("agents") (Join-Path $outDir "agents.log")
-    $agentList = Invoke-Probe $path @("agent", "list") (Join-Path $outDir "agent-list.log")
     $helpText = Get-Content -LiteralPath (Join-Path $outDir "help.log") -Raw
 
     $modeValues = @()
@@ -59,14 +79,14 @@ try {
         print_arg = if ($helpText.Contains("--print")) { "--print" } elseif ($helpText.Contains("-p")) { "-p" } else { $null }
         interactive_arg = if ($helpText.Contains("--prompt-interactive")) { "--prompt-interactive" } elseif ($helpText.Contains("-i")) { "-i" } else { $null }
         direct_is_controller_route = $true
-        agent_list_command = if ($agent.exit_code -eq 0) { "agent" } elseif ($agents.exit_code -eq 0) { "agents" } elseif ($agentList.exit_code -eq 0) { "agent list" } else { $null }
+        agent_list_command = $null
     }
     $result = [ordered]@{
         available = ($help.exit_code -eq 0)
         executable = $path
         version = $version
         help = $help
-        agent_probes = [ordered]@{ agent = $agent; agents = $agents; agent_list = $agentList }
+        agent_probes = [ordered]@{}
         capabilities = $capabilities
         login = "UNKNOWN"
         headless = "UNVERIFIED"

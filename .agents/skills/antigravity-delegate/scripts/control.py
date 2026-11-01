@@ -8,6 +8,9 @@ import runpy
 import subprocess
 import sys
 
+# Invoking the distributed Skill must not create untracked bytecode in its host
+# project before the clean-source check (also works when runpy is used).
+sys.dont_write_bytecode = True
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CORE = {"create", "validate", "transition", "start", "worktree-create", "worktree-remove"}
@@ -17,7 +20,9 @@ HELP = """usage: control.py [--repo PATH] COMMAND [ARGS...]
 Unified local AI development control plane.
 
 Daily delegation:
+  doctor [--executable PATH]     read-only environment and source readiness check
   run "REQUEST" [--check CMD]    isolated agy run without task scaffolding
+  runs [RUN-ID|latest]           list or inspect retained daily runs
 
 Task protocol commands:
   init                          initialize minimal target project state
@@ -64,7 +69,11 @@ def _main(argv: list[str] | None = None) -> int:
     command = rest[0]
     # Resolve before chdir: a relative init path must not be applied twice.
     repo = repo.expanduser().resolve()
-    if command == "run":
+    if command == "doctor":
+        entry, child = SCRIPT_DIR / "doctor.py", rest[1:]
+    elif command == "runs":
+        entry, child = SCRIPT_DIR / "run_history.py", rest[1:]
+    elif command == "run":
         entry, child = SCRIPT_DIR / "quick_run.py", rest[1:]
     elif command == "init":
         entry = SCRIPT_DIR / "init_project.py"
@@ -80,7 +89,7 @@ def _main(argv: list[str] | None = None) -> int:
     else:
         print(f"ERROR: unknown command: {command}", file=sys.stderr)
         return 2
-    if (explicit_repo and command in CORE | DELEGATION | {"status", "run"}
+    if (explicit_repo and command in CORE | DELEGATION | {"status", "run", "runs"}
             and not any(arg in {"-h", "--help"} for arg in rest[1:])):
         result = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo,
                                 capture_output=True, text=True, check=True)
@@ -100,6 +109,11 @@ def _main(argv: list[str] | None = None) -> int:
                 return exc.code
             if exc.code:
                 print(exc.code, file=sys.stderr)
+            return 2
+        except ModuleNotFoundError as exc:
+            print(f"ERROR: missing Python dependency {exc.name}. Install with: "
+                  f'"{sys.executable}" -m pip install -r "{SCRIPT_DIR / "requirements-local.txt"}"',
+                  file=sys.stderr)
             return 2
         except (ValueError, OSError, RuntimeError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)

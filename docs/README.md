@@ -5,6 +5,7 @@
 | 要做的事 | 阅读位置 |
 |---|---|
 | 安装、快速开始 | [中文 README](../README.zh-CN.md) / [English README](../README.md) |
+| 查看本轮审核和流程修复 | [2026-11-01 流程审核](maintenance/workflow-audit-2026-11-01.md) |
 | 日常一次委派，无需任务契约 | [run 使用指南](../.agents/skills/antigravity-delegate/references/quick-start.md) |
 | 核对当前能力、配置缺口与未完成任务 | [当前状态](STATUS.md) |
 | 查询命令参数、输出与副作用 | [命令参考](../.agents/skills/antigravity-delegate/references/cli.md) |

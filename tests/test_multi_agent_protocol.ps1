@@ -22,6 +22,14 @@ function Save-Config($Value, [string]$Path) {
     $Value | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+$probe = Join-Path $repo '.agents\skills\antigravity-delegate\scripts\probe_agy.ps1'
+$probeOutput = Join-Path $runtime 'safe-probe'
+& powershell -NoProfile -ExecutionPolicy Bypass -File $probe -Executable $fakeAgy -OutputDir $probeOutput | Out-Null
+Assert-True ($LASTEXITCODE -eq 0) 'Capability probe failed'
+$probeRecord = Get-Content (Join-Path $probeOutput 'capabilities.json') -Raw | ConvertFrom-Json
+Assert-True (@($probeRecord.agent_probes.PSObject.Properties).Count -eq 0) 'Probe must never invoke agent/agents commands'
+Assert-True (-not (Test-Path (Join-Path $probeOutput 'agent.log'))) 'Probe unexpectedly invoked an agent'
+
 function Run-Pair([string]$Name, [string]$Mode) {
     $output = Join-Path $runtime $Name
     New-Item -ItemType Directory -Path $output | Out-Null

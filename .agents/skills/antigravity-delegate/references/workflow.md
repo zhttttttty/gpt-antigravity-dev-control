@@ -12,7 +12,9 @@ Root 定义目标、范围、验收、风险、检查和真实角色，执行者
 python .agents/skills/antigravity-delegate/scripts/control.py create TASK-001 --title "有界修改" --objective "可观察的结果" --risk low --mode delegated
 ```
 
-补齐 queue/TASK-001 的七文件契约，检查 planning.work_type、judgment、context_continuity、
+create 自动生成七个文件。主控先填写 task.yaml 的范围、验收与检查，以及必要的 context/brief；
+执行、QA 和 Review 回执在对应阶段生成或填写，规划时不必逐份手工补齐。
+检查 planning.work_type、judgment、context_continuity、
 acceptance_determinism。默认只将低判断、可确定验收的机械工作交给 agy；语义、安全、架构、
 高判断、强连续性或低验收确定性的工作默认 direct。风险和 authority 另决定是否需要审批。
 
@@ -53,20 +55,25 @@ direct 不运行 agy 的 launch、verify、collect。实际代理身份未知时
 ## 3B. 本地 agy
 
 ```powershell
-python .agents/skills/antigravity-delegate/scripts/control.py probe
 python .agents/skills/antigravity-delegate/scripts/control.py prepare TASK-001 --approve
-python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve --interactive
+python .agents/skills/antigravity-delegate/scripts/control.py launch TASK-001 --approve
 python .agents/skills/antigravity-delegate/scripts/control.py verify TASK-001 --approve --approval-file .ai/runtime/verify-approval.yaml
 python .agents/skills/antigravity-delegate/scripts/control.py collect TASK-001
 ```
 
+首次使用或排障时先 doctor；需要保存探测日志才用 probe。launch 默认无头运行，需要确认且有真实终端时加 --interactive。
 prepare 的路由或风险要求审批时也需 --approval-file PATH。verify 始终要求 --approve 和绑定
 当前契约的独立审批文件，因为它要执行确切的检查矩阵。两个 --approve 都不能替代审批 YAML。
+同一份有效审批文件可在契约哈希不变时复用，不为每条命令重复请求同一授权；契约改动后重新核对。
 
 agy 只实现、运行必要聚焦检查、提交实现并写 IMPLEMENTED 回执，然后退出。
 verify 在工作树运行 adversarial → fast → final 检查，记录实际命令和工作区证据，
 全部通过才转为 COMPLETE；失败后续阶段标 NOT_RUN，之后由 collect 核验并进入 REVIEW 或阻塞。
 collect 不自动独立审查或 DONE。旧契约的兼容规则见[回执协议](receipt-protocol.md)。
+verify 在启动第一条命令前检查整个矩阵，拒绝不明确的 shell 语法和同一命令的冲突策略。
+验证结果绑定当时 HEAD 与回执 SHA-256，控制器目录保留回执副本；collect 拒绝验证后更换代码或回执。
+旧版本 VERIFIED 记录缺少此绑定时不能直接收集为已验证，需经主控审查后建立新尝试和验证证据。
+若进程意外退出停在 VERIFYING，读取 verify/progress.json 与实际进程，按故障恢复处理，不能重用不完整 PASS。
 
 检查默认 argv，shell:true 需在获批契约中明确声明。单命令默认 600 秒、总检查默认 1800 秒，
 由共享进程模块执行及超时清理，并逐条复核分支、HEAD 和工作区。工作树不是操作系统沙箱。

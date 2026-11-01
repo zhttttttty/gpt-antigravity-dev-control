@@ -43,7 +43,8 @@ READY_FOR_REVIEW 只表示可交回审查，检查没有配置时会明确显示
 [高级任务流程](.agents/skills/antigravity-delegate/references/workflow.md)：
 init → create → validate/route → start 或 prepare/launch/verify/collect → 独立审查。
 路由按判断强度和上下文连续性选择后端；agy 实现后由控制器独立 verify，不以模型声明代替命令证据。
-验证后的 HEAD 或回执被替换会阻止 collect；旧验证记录缺少快照绑定时需重新建立验证证据。
+经 verify 的运行若替换 HEAD 或回执会阻止 collect；旧验证记录缺少快照绑定时需重新建立验证证据。
+仅含旧 checks.required 的直接收集兼容路径仍属于执行者声明，不能当成控制器验证通过。
 
 ## 权限与验证边界
 

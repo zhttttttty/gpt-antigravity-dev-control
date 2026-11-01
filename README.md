@@ -46,7 +46,8 @@ For architecture, security, migrations, deployment, persistent approvals, or rep
 use the [full workflow](.agents/skills/antigravity-delegate/references/workflow.md).
 The full path uses adaptive backend selection and prepare/launch/verify/collect. Existing schema v2
 states, legacy required checks, approvals, receipts, and the DONE gate remain available.
-Collection binds to the verified HEAD and receipt hash. Older unsealed verification needs fresh evidence.
+For runs processed by verify, collection binds to the verified HEAD and receipt hash; older unsealed
+verification needs fresh evidence. The legacy required-only direct collection path remains executor-reported.
 
 ## Boundaries
 

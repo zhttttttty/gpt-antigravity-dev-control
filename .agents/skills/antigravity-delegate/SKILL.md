@@ -38,7 +38,7 @@ run 无需 init、模型配置或七文件契约，要求干净且已有提交�
 ## 什么时候升级为完整协议
 
 架构、认证、安全、迁移、部署、破坏性或需要持久审批/多轮返工的任务，先建立完整任务契约。
-使用 init/create/validate/route，再选择 direct 的 start 或本地委派 prepare/launch/collect。
+使用 init/create/validate/route，再选择 direct 的 start 或本地委派 prepare/launch/verify/collect。
 高级 route 同时返回 mode 和 backend。高判断、语义、安全、架构、强连续性或验收不确定的工作默认 direct；
 Root 选择 direct 后可明确派发有界 worker，不必先等待 agy 故障。
 agy 只写 IMPLEMENTED，退出后运行 verify 的获批检查矩阵，再 collect；不能把实现声明当成验证完成。

@@ -13,11 +13,13 @@ agy 与检查共享 `process_utils` 的参数和超时处理。高级 verify 保
 | 组件 | 职责 | 状态与输出 |
 |---|---|---|
 | `scripts/control.py` | 解析 `--repo`、分派命令、统一部分错误输出 | 不单独持久化状态 |
+| `scripts/doctor.py` | 用标准库自检 Python、依赖、Git、源状态和 agy 帮助能力 | 只读 JSON，不证明登录或实际模型可用 |
 | `scripts/quick_run.py` | 一次需求、工作树、执行与调用者检查，无持久任务 | Git 公共元数据目录 `agy-runs/<id>/` |
+| `scripts/run_history.py` | 列出日常运行，按 ID 或最近更新时间读取完整结果 | 读取 `agy-runs/<id>/result.json`，不重试或清理 |
 | `scripts/init_project.py` | 初始化模板、任务目录、忽略规则，预检可选配置安装 | `.ai/`，可选 `.codex/` |
 | `scripts/ai.py` | 创建、验证、迁移任务，管理 direct 工作树 | `.ai/tasks/<state>/<id>/`、`.worktrees/<id>/` |
 | `scripts/task_data.py` | YAML、契约摘要、共享自适应路由、审批与 DONE 证据门 | YAML 文件和契约哈希 |
-| `scripts/process_utils.py` | 共用 argv/shell 检查、日志、超时进程树清理 | 检查日志与真实退出码 |
+| `scripts/process_utils.py` | 共用检查和 agy 进程执行、日志、超时清理；POSIX 交互终端前台交接 | 日志与真实退出码，进程树清理为尽力处理 |
 | `scripts/delegate.py` | 准备、启动、verify、收集、受控恢复与诊断 | `.ai/runtime/logs/<id>/run-N/`、委派锁 |
 | `scripts/adapters/antigravity_cli.py` | 探测 agy、构造参数、启动进程、解析事件及诊断 | 日志、事件、执行结果 |
 | `scripts/check_orchestration.py` | 比较显式配置、角色与任务模板 | 离线一致性 JSON |
@@ -56,6 +58,7 @@ run 不自动提交、合并或删除工作树，不进入 status 的持久任�
 [任务协议](../../.agents/skills/antigravity-delegate/references/task-protocol.md)、
 [回执协议](../../.agents/skills/antigravity-delegate/references/receipt-protocol.md)。
 公共命令或持久状态语义变化需先记录 ADR，再更新测试与迁移说明。
+3.6.0-local 的新增命令及验证绑定已在 [ADR-008](../../.agents/skills/antigravity-delegate/references/decisions/ADR-008-workflow-readiness-and-verification.md) 中补记实现后的决策与兼容说明。
 
 Worktree 提供 Git 隔离，不提供操作系统沙箱。Scope 由准备和收集检查约束，
 不能阻止具备系统权限的执行进程越界。`--auto-approve`（旧名 --full-access）只改变 agy 工具确认参数。

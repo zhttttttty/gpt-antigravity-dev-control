@@ -55,11 +55,20 @@ READY_FOR_REVIEW 后检查完整结果、Diff、新增文件和日志，再明�
 
 ## 实际验证
 
-- Windows 本地全量 158 项 Python unittest 通过（141.095 秒）。
+- 初轮 Windows 本地全量 158 项 Python unittest 通过（141.095 秒）；随后新增 POSIX 控制终端回归，最终套件为 159 项。
+- 实现提交 `241390df444c52bcb7f0efa20694bea63ef0db34` 的 [GitHub CI](https://github.com/zhttttttty/gpt-antigravity-dev-control/actions/runs/41302722590) 全部通过：Linux 159 项均通过（25.050 秒）；Windows 159 项中通过 158 项、跳过 1 项 POSIX 专属测试（163.600 秒）。
+- Linux 真实 PTY 测试验证交互子进程保留控制终端和前台进程组；Windows 另通过 PowerShell 解析和协议测试。
 - PowerShell 多代理协议测试通过，包含只读探测和原有调度、恢复检查。
 - 23 个 Python 文件语法、17 个 YAML、18 个 TOML 解析通过。
-- 55 份维护范围内 Markdown 的 123 个本地链接检查通过。
+- 提交前复核 56 份维护范围内 Markdown、122 个本地链接及 2 段 YAML 示例，均通过。
 - 根项目及配置夹具 check-orchestration 均 PASS；这是离线配置一致性检查。
 - 真实子进程模拟执行覆盖改文件、写报告、控制器检查及按 ID 找回结果；源工作区保持不变。
 - 持久任务仍为 3 个 REVIEW、1 个 BLOCKED；任务、人工状态和归档资料无 Git 差异。
 - 维护文件 Git 空白检查通过。CI 已扩展为 Linux、Windows 两端运行 Python 工作流测试。
+
+## 提交与审阅
+
+实现已推送至 `codex/workflow-audit-20261101`，审阅入口为 [PR #2](https://github.com/zhttttttty/gpt-antigravity-dev-control/pull/2)。
+本次提交前再次对照实现补齐测试证据、命令与组件说明、当前状态及新旧收集路径的兼容边界。
+3.6.0-local 位于该 PR 分支，尚未合入 main；main 的已核验版本仍为 3.5.0-local / `0dffa7d`。
+真实 Provider 编码效果、实际模型访问和成本收益仍未验证。

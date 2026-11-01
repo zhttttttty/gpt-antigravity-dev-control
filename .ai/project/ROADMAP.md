@@ -7,6 +7,7 @@
 
 以上轮已合并的 main `0dffa7d` 为基线，3.6.0-local 聚焦 doctor → run → runs 日常路径，
 修复能力探测、首次使用缓存、执行器超时与验证证据绑定。见[审核记录](../../docs/maintenance/workflow-audit-2026-11-01.md)。
+实现已提交至 [PR #2](https://github.com/zhttttttty/gpt-antigravity-dev-control/pull/2)，对应 159 项 Python 套件的 Linux、Windows CI 均通过；尚未合入 main。
 
 ## 已有任务
 
@@ -17,7 +18,7 @@
 | TASK-ROUTE-002-SMOKE | REVIEW | PASS_WITH_NOTES | 核实既有证据及适用完成门，保留人工合并边界 |
 | TASK-ROUTE-003-IDENTITY-BOOTSTRAP | REVIEW | PASS | 既有记录仍缺最终完成门；不因 review PASS 自动 DONE |
 
-## 当前上游整合（2026-10-28）
+## 已完成的上游整合（2026-10-28）
 
 以 main `db1426b` 为源代码整合基线，发布标识使用 3.5.0-local，保留日常 run 与本地安全改进，
 带入自适应路由、独立 verify、分离预算及受控恢复。见[整合计划与结果](../../docs/maintenance/upstream-integration-2026-10-28.md)。

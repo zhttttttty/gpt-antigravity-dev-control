@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import shlex
 import signal
 import subprocess
+import sys
 import time
 
 
@@ -59,8 +61,37 @@ def terminate_process_tree(process: subprocess.Popen) -> None:
         process.wait(timeout=5)
 
 
+@contextmanager
+def foreground_terminal(process, interactive):
+    """Give an interactive POSIX child the existing controlling terminal."""
+    previous = None
+    fd = None
+
+    def foreground(group):
+        old = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        try:
+            os.tcsetpgrp(fd, group)
+        finally:
+            signal.signal(signal.SIGTTOU, old)
+
+    try:
+        if interactive and os.name != "nt":
+            fd = sys.stdin.fileno()
+            previous = os.tcgetpgrp(fd)
+            foreground(process.pid)
+            # A child that read stdin before the handoff may have received SIGTTIN.
+            os.killpg(process.pid, signal.SIGCONT)
+        yield
+    except (OSError, ValueError):
+        terminate_process_tree(process)
+        raise
+    finally:
+        if previous is not None:
+            foreground(previous)
+
+
 def run_command(command: str | list[str], *, cwd: Path, log: Path,
-                timeout: float, shell: bool = False) -> dict:
+                timeout: float, shell: bool = False, interactive: bool = False) -> dict:
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
         raise ValueError("Check timeout must be positive")
     if shell:
@@ -72,15 +103,21 @@ def run_command(command: str | list[str], *, cwd: Path, log: Path,
         if not argv or not all(isinstance(arg, str) and "\0" not in arg for arg in argv):
             raise ValueError("Check argv must be a nonempty string list")
     options = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
-               else {"start_new_session": True})
+               else {"process_group": 0} if interactive else {"start_new_session": True})
     started = time.monotonic()
     result = {"exit_code": None, "result": "FAIL", "log": str(log), "shell": shell}
     with log.open("wb") as stream:
+        if interactive:
+            stream.write(b"Interactive terminal output is not captured; see the executor log.\n")
+            stream.flush()
         try:
-            with subprocess.Popen(argv, cwd=cwd, shell=shell, stdin=subprocess.DEVNULL,
-                                  stdout=stream, stderr=subprocess.STDOUT, **options) as process:
+            with subprocess.Popen(argv, cwd=cwd, shell=shell,
+                                  stdin=None if interactive else subprocess.DEVNULL,
+                                  stdout=None if interactive else stream,
+                                  stderr=None if interactive else subprocess.STDOUT, **options) as process:
                 try:
-                    result["exit_code"] = process.wait(timeout=timeout)
+                    with foreground_terminal(process, interactive):
+                        result["exit_code"] = process.wait(timeout=timeout)
                 except subprocess.TimeoutExpired:
                     terminate_process_tree(process)
                     stream.write(b"\nTIMEOUT\n")

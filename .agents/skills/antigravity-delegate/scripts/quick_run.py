@@ -63,12 +63,16 @@ def plan(root: Path, request: str, allow: list[str], checks: list[str],
     if len(context.encode("utf-8")) > 32_000:
         raise ValueError("Request context exceeds 32,000 UTF-8 bytes; reduce the request")
     root = Path(git(root, "rev-parse", "--show-toplevel").strip()).resolve()
-    base = git(root, "rev-parse", "--verify", "HEAD^{commit}").strip()
+    try:
+        base = git(root, "rev-parse", "--verify", "HEAD^{commit}").strip()
+    except subprocess.CalledProcessError as exc:
+        raise ValueError("Repository has no HEAD commit; review and create an initial commit before run") from exc
+    dirty = git(root, "status", "--porcelain", "--untracked-files=all")
     return {"repository": str(root), "base_commit": base, "request": request.strip(),
             "allow": [p.replace("\\", "/") for p in allow], "check_commands": checks,
             "timeout": timeout, "check_timeout": check_timeout,
             "total_check_timeout": total_check_timeout, "shell_checks": shell_checks,
-            "source_clean": not bool(git(root, "status", "--porcelain", "--untracked-files=all")),
+            "source_clean": not bool(dirty), "source_changes": dirty.splitlines()[:20],
             "context": context}
 
 
@@ -102,9 +106,11 @@ def run(root: Path, request: str, *, allow=None, checks=None, timeout=1260,
     details = plan(root, request, allow or ["**"], checks or [], timeout, check_timeout,
                    total_check_timeout, shell_checks)
     if dry_run:
-        return {key: value for key, value in {"status": "DRY_RUN", **details}.items() if key != "context"}
+        return {key: value for key, value in {"status": "DRY_RUN", **details,
+                "next_step": "Run doctor to check dependencies and agy; remove --dry-run when ready"}.items() if key != "context"}
     if not details["source_clean"]:
-        raise ValueError("Source checkout is dirty; commit or otherwise preserve changes before run. No uncommitted content is copied")
+        raise ValueError("Source checkout is dirty; inspect git status and preserve changes before run. "
+                         "No uncommitted content is copied. Changed paths: " + "; ".join(details["source_changes"]))
     root = Path(details["repository"])
     adapter = adapter or AntigravityCLI(timeout=timeout, launch_prompt=LAUNCH_PROMPT)
     adapter.validate_launch()
@@ -179,6 +185,8 @@ def run(root: Path, request: str, *, allow=None, checks=None, timeout=1260,
                 and all(c["result"] == "PASS" for c in record["checks"])) else "FAIL"
         if record["status"] != "READY_FOR_REVIEW":
             record["next_step"] = "Inspect logs, worktree and actual processes before retrying or cleanup; no automatic recovery"
+        else:
+            record["next_step"] = "Review result_file, tracked.diff, every untracked file and check log; after acceptance explicitly integrate the reviewed changes"
         record["elapsed_seconds"] = round(time.monotonic() - started, 3)
         save(result_path, record)
     return record

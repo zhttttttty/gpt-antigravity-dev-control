@@ -4,6 +4,11 @@
 
 ## 一个命令
 
+首次使用先运行 `python .agents/skills/antigravity-delegate/scripts/control.py doctor`。
+它不创建 `.ai`、工作树或模型会话；缺依赖时给出安装命令，脏源仓库列出路径。
+`READY` 只证明本地前置条件满足，登录和实际无头执行仍未验证。不必每次重复自检。
+Skill 文件若复制到目标项目，也要先审查并提交；或用已有安装的绝对脚本路径加 `--repo`，无需复制。
+
 在安装了 Skill 的 Git 项目根目录执行：
 
 ```powershell
@@ -70,6 +75,9 @@ Windows 指定原生 agy.exe 可用 --executable；需要真实终端时使用 -
 
 READY_FOR_REVIEW 和 DRY_RUN 返回 0，其余返回 2；0 不是 DONE 或合并证明。
 轻量运行不进入持久任务队列，因此 status --json 只列高级协议任务，不列这些运行目录。
+使用 `control.py runs` 列出日常记录，默认最近更新的 20 项，可用 `--limit N` 调整（1–1000）。
+`control.py runs RUN-ID` 返回完整结果，`runs latest` 读取最近更新记录。查询只读；损坏记录会明确报错。
+命令结果的 next_step 提示后续审查或故障处理。run 返回 READY_FOR_REVIEW 后，先核对业务结果，再明确整合修改。
 默认保留所有运行工作树，读取 result.json 中的确切路径和分支后再决定合并或移除。
 处理好业务修改后按 Git 自身的 worktree 管理流程清理，不要直接递归删除 Git 元数据目录。
 

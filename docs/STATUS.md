@@ -1,7 +1,10 @@
 # 当前仓库状态
 
-本页是 **2026-10-28** 根据本地文件和只读命令生成的说明，不自动更新任务状态。
-版本为 `3.5.0-local`，外层 HEAD 仍为 `2e8706e`，当前未提交源码已整合 GitHub main `db1426b`；不能用 HEAD 原始内容代表当前工作区。
+本页是 **2026-11-01** 根据本地文件和只读命令更新的说明，不自动更新任务状态。
+上轮 3.5.0-local 已通过 PR #1 合入 GitHub main `0dffa7d`；本轮以该版本为基线审核并修复流程，
+当前分支版本为 `3.6.0-local`，实现提交 `241390d` 已推送至 [PR #2](https://github.com/zhttttttty/gpt-antigravity-dev-control/pull/2)，尚未合入 main。
+实现的 Linux、Windows CI 均通过；最终 Python 套件 159 项，Windows 跳过 1 项 POSIX 专属测试。
+差异与验证范围见[流程审核](maintenance/workflow-audit-2026-11-01.md)。
 
 ## 已存在的能力与验证边界
 
@@ -14,7 +17,7 @@
 | `.ai/state/PROJECT_STATE.yaml` | 保留人工 READY / 空 active_tasks；当前没有 IN_PROGRESS，此空列表不构成错误。全部未完成任务由 status --json 实时读取 |
 | 真实 agy、认证、模型路由、额度及成本 | 本轮未调用真实 Provider；模型可用性、额度和成本仍需实际验证 |
 
-此前文档整理识别出缺少配置，本轮已通过安全安装补齐，并验证完整安装、重复安装和冲突保护。
+2026-10-28 已通过安全安装补齐此前缺失的配置，并验证完整安装、重复安装和冲突保护。
 新增 `status --json` 区分 IN_PROGRESS 与全部未完成任务；未据此更改已有任务或人工摘要。
 
 ## 日常入口与权限
@@ -24,6 +27,8 @@ run 为普通任务提供一次委派，不需要 init 或手工回执；创建�
 原生代理的无效 sandbox_mode 已从分发、安装文件和夹具中移除，检查器拒绝无效会话字段覆盖。
 真实权限继承父会话，不将“不编辑”指令视作系统沙箱。
 当前 run 和 verify 共用检查执行模块；默认 argv，日常 shell 需 --shell-checks，高级 shell 必须在获批契约声明。
+新增 doctor 环境自检和 runs 日常记录查询，agy 启动也使用共享进程超时处理；
+高级 collect 绑定 verify 的 HEAD 与回执哈希。
 
 ## 持久任务快照
 
@@ -39,11 +44,15 @@ run 为普通任务提供一次委派，不需要 init 或手工回执；创建�
 
 表中执行和测试结果来自任务内既有回执与审查记录，本次未重新验证历史实现快照。
 
-## 多个代码目录
+## 本地维护工作区快照
+
+以下是当前维护机器的实际目录，不是每个 GitHub clone 都会包含的发行内容。
 
 外层根目录与 `gpt-antigravity-dev-control/` 为不同 Git 仓库，嵌套仓库 HEAD 为
 `db1426b`，含未提交修改。外层另有 7 个注册工作树，其中 2 个含未提交修改。
 本文和项目说明只描述外层仓库，不将嵌套仓库后续版本混入当前功能清单。
 
-选择版本、继续旧任务、运行时配置核验和实际成本测量仍属于后续工作，见[工作索引](../.ai/project/ROADMAP.md)。
-文档组织方式见[目录导航](README.md)，此前文档验证见[文档维护记录](maintenance/documentation-2026-10-28.md)，此前实现与清理见[优化记录](maintenance/optimization-2026-10-28.md)，此前轻量化见[计划及结果](maintenance/lightweight-plan-2026-10-28.md)，当前见[上游整合记录](maintenance/upstream-integration-2026-10-28.md)。
+当前外层未跟踪的独立嵌套仓库也会使真实 run 的干净源检查失败；不能据 CI 通过认定维护工作区可直接执行。
+继续旧任务、运行时配置核验和实际成本测量见[工作索引](../.ai/project/ROADMAP.md)。
+文档组织见[目录导航](README.md)，当前修复见[流程审核](maintenance/workflow-audit-2026-11-01.md)，
+此前整合过程见[上游整合记录](maintenance/upstream-integration-2026-10-28.md)。

@@ -4,29 +4,36 @@
 
 让 Codex 用一次调用把边界明确的修改交给 agy：自动隔离工作树、保存日志、执行指定检查，
 再把实际改动交回 Codex 验收。复杂或高风险任务使用风险自适应的完整任务协议。
-本版整合 GitHub main `db1426b`，保留本地轻量入口、安全安装、状态 JSON 和权限修正。
+日常路径为 **自检 → 运行 → 查看结果**；只有复杂任务才进入完整协议。
 
-当前版本：**3.5.0-local**。主要交付物为 `.agents/skills/antigravity-delegate/`。
+当前版本：**3.6.0-local**。主要交付物为 `.agents/skills/antigravity-delegate/`。
 
 ## 最短使用路径
 
-需要 Git、Python 3.11+、可用的 agy 安装；复制整个 Skill 到项目后安装 Python 依赖。
+需要 Git、Python 3.11+、可用的原生 agy。复制整个 Skill 到目标项目的 `.agents/skills/`，
+审查并提交安装文件及预期基线；也可从现有安装位置用绝对脚本路径加 `--repo` 调用，无需重复复制。
 源项目必须已有提交且工作区干净，未提交文件和被忽略文件不会复制到执行工作树。
 
 ```powershell
 python -m pip install -r .agents/skills/antigravity-delegate/scripts/requirements-local.txt
-python .agents/skills/antigravity-delegate/scripts/control.py run "补充 README 的安装说明" --allow README.md --check "git diff --check"
+$ctl = Join-Path $PWD '.agents/skills/antigravity-delegate/scripts/control.py'
+python $ctl doctor
+python $ctl run "补充 README 的安装说明" --allow README.md --check "git diff --check"
+python $ctl runs latest
 ```
 
-不需要先 init、配置模型、创建 task.yaml 或填写回执。先预览且不调用 agy：
+`doctor` 只检查环境、Git 与 agy 帮助信息；按输出解决阻塞即可，无需每次运行都重复自检。
+日常不需要 init、模型配置或 task.yaml。先预览且不调用 agy：
 
 ```powershell
-python .agents/skills/antigravity-delegate/scripts/control.py run "补充 README 的安装说明" --allow README.md --dry-run
+python $ctl run "补充 README 的安装说明" --allow README.md --dry-run
 ```
 
 命令返回结果 JSON、工作树、Diff 和检查日志路径。完整结果保存在 Git 公共元数据目录
 `agy-runs/<run-id>/result.json`；控制台只展示最多 20 个变更路径。
 READY_FOR_REVIEW 只表示可交回审查，检查没有配置时会明确显示 NOT_RUN。
+用 `runs` 列出记录、`runs RUN-ID` 查看完整结果；`runs latest` 读取最近更新的记录。
+确认实际 Diff、新增文件和检查结果后，由 Codex/用户明确整合已审查的修改。
 检查默认原生 argv；确需 shell 语法时显式增加 --shell-checks。共享执行内核提供单命令与总超时，逐条复核变更。
 不会自动提交、合并、重试或删除执行工作树。
 
@@ -36,7 +43,8 @@ READY_FOR_REVIEW 只表示可交回审查，检查没有配置时会明确显示
 [高级任务流程](.agents/skills/antigravity-delegate/references/workflow.md)：
 init → create → validate/route → start 或 prepare/launch/verify/collect → 独立审查。
 路由按判断强度和上下文连续性选择后端；agy 实现后由控制器独立 verify，不以模型声明代替命令证据。
-原 schema v2、审批、回执和 DONE 门保持兼容。
+经 verify 的运行若替换 HEAD 或回执会阻止 collect；旧验证记录缺少快照绑定时需重新建立验证证据。
+仅含旧 checks.required 的直接收集兼容路径仍属于执行者声明，不能当成控制器验证通过。
 
 ## 权限与验证边界
 
@@ -49,7 +57,7 @@ Codex 原生子代理继承父会话权限，代理文件中的 sandbox_mode 不
 
 - [日常使用指南](.agents/skills/antigravity-delegate/references/quick-start.md)：参数、结果、失败与后续审查。
 - [文档导航](docs/README.md)、[命令参考](.agents/skills/antigravity-delegate/references/cli.md)。
-- [本轮整合记录](docs/maintenance/upstream-integration-2026-10-28.md)、[当前状态](docs/STATUS.md)。
+- [本轮审核与修复](docs/maintenance/workflow-audit-2026-11-01.md)、[当前状态](docs/STATUS.md)。
 - [贡献指南](CONTRIBUTING.md)、[安全策略](SECURITY.md)、[成本测量](COST_METRICS.md)。
 
 历史资料、旧任务和独立嵌套仓库保留用于溯源，见文档导航。许可证：[MIT](LICENSE)。

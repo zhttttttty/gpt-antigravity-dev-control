@@ -5,7 +5,7 @@
 本项目让 Codex 通过本地 agy 完成有界修改，默认使用一次 run 委派；需要审批和持久任务时再使用完整控制协议。
 主要交付物为 `.agents/skills/antigravity-delegate/`，包含统一 CLI、任务与回执模板、
 Antigravity CLI Adapter、PowerShell 多代理审阅脚本和操作说明。
-版本以仓库根目录 `VERSION` 为准，当前文件内容为 `3.5.0-local`。
+版本以仓库根目录 `VERSION` 为准，当前文件内容为 `3.6.0-local`。
 
 ## 要解决的问题
 
@@ -20,6 +20,7 @@ Antigravity CLI Adapter、PowerShell 多代理审阅脚本和操作说明。
 - 人类：完成适用的事前审批、残余风险接受和最终合并。
 
 日常 run 无需初始化、模型角色或手工回执，在干净 HEAD 的工作树完成实现与检查，结果保存在 Git 公共元数据目录 agy-runs。
+首次安装或排障使用只读 doctor，轻量运行通过 runs、runs RUN-ID、runs latest 查询；它们不依赖持久任务目录。
 高级流程支持 `direct`、`delegated`、`approval_required`，按工作类型、判断强度、上下文连续性与验收确定性选择后端，沿用 schema v2。
 整合上游 main `db1426b` 的 verify、分离预算和受控 partial 恢复；日常与高级检查共用进程执行模块。
 本地委派使用用户已有的 agy 安装；任务事实保存在 `.ai/tasks/`，运行记录保存在
@@ -37,7 +38,7 @@ PowerShell 调度测试需 Windows PowerShell，真实委派另需可用的 agy 
 - [架构](ARCHITECTURE.md)：组件与状态边界。
 - [实现](../../.agents/skills/antigravity-delegate/scripts/)及[测试](../../tests/)：实际行为。
 - [任务目录](../tasks/)：持久任务、回执及审查结果。
-- [当前状态](../../docs/STATUS.md)：2026-10-28 文件检查快照和验证缺口。
+- [当前状态](../../docs/STATUS.md)：2026-11-01 文件检查快照、分支发布状态和验证缺口。
 - [变更记录](../../CHANGELOG.md)、[ADR](../../.agents/skills/antigravity-delegate/references/decisions/)：版本与决策历史。
 
 本说明描述当前外层仓库；嵌套的 `gpt-antigravity-dev-control/` 是另一个独立仓库，

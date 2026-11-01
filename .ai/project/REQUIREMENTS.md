@@ -21,6 +21,10 @@
 | FR-015 | 高级任务的 IMPLEMENTED 由独立控制器 verify 验证，分阶段执行并绑定审批 | 上游验证用例及新增超时短路测试 |
 | FR-016 | 日常与高级检查默认 argv，共享超时进程树清理并复核工作区 | process_utils 与跨入口测试 |
 | FR-017 | 路由与 direct 启动保持一致，显式审批不得因自适应路由降低 | route_task、start 与衔接测试 |
+| FR-018 | 无需 init 的环境自检；缺 PyYAML 仍提供修复指引，统一 CLI 不在宿主项目生成字节码 | `doctor.py`、`control.py`、`tests/test_daily_workflow.py` |
+| FR-019 | 只读查询日常运行列表、指定 ID 和最近更新记录，明确报告损坏记录 | `run_history.py`、日常工作流回归测试 |
+| FR-020 | 经 verify 的运行收集时绑定验证 HEAD 与回执哈希，验证后的替换不得继承检查结论 | `delegate.py` 的 verify/collect、篡改快照与回执回归测试；仅旧 required 的直接收集兼容路径不具备控制器验证声明 |
+| FR-021 | 普通 init 与可选 profile 安装均预检目标链接及文件类型；agy 启动支持有界超时清理 | `init_project.py`、`process_utils.py`、安装和 Adapter 回归测试 |
 
 ## 非功能需求
 

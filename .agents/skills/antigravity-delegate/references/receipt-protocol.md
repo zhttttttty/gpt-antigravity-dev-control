@@ -38,6 +38,9 @@ DONE 要求 known_issues_review 一对一原文映射、evidence_checked，以�
 状态改为 COMPLETE 或 FAILED。控制器不得替执行者编造验收声明，也不得把 FAILED
 执行结果升级为 COMPLETE。仅含旧 `checks.required`、不含 staged gate 的兼容契约可直接
 collect 旧执行者写出的完整 COMPLETE 回执；新 staged-contract 必须经过 VERIFIED。
+凡本地运行已进入 VERIFIED 或 VERIFICATION_FAILED，collect 都会核对控制器记录的验证 HEAD 和回执 SHA-256；
+任何后续替换都会失败。verify 目录保留独立回执副本；旧版本已验证但未绑定的记录需按恢复流程建立新尝试与验证证据。
+上述仅 checks.required 的直接收集兼容路径，仍以执行者声明为证据，不应标为已通过控制器 verify。
 主控拥有状态迁移权限，执行分支上的任务副本为历史契约，不是第二个活动队列。
 
 本地 agy 的 `collect` 核验身份、版本和声明的必要证据，观测 Git 变更与保护范围，

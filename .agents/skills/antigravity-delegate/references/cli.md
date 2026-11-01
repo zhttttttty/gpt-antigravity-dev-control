@@ -21,6 +21,14 @@ check-orchestration 按指定目录读取配置，允许检查无独立 Git 的�
 
 ## 日常一次委派（无需 init）
 
+首次使用：`control.py doctor [--executable PATH]`。标准输出为 JSON；本地前置条件齐备返回 0，
+缺依赖、无 HEAD、源不干净或 CLI 不兼容返回 2，并逐项提供 next_step。只读取帮助信息，不验证登录或调用模型。
+doctor 使用标准库启动，因此缺 PyYAML 也能获得修复建议。
+
+查看结果：`control.py runs [RUN-ID|latest] [--limit N]`。不提供 ID 时列出最近更新的运行记录，
+默认最多 20 项（允许 1–1000）；提供 ID 或 latest 时返回完整结果，不截断路径清单。
+`status --json` 仍只读持久任务，`runs` 专门读取轻量运行，不隐式重试或清理。
+
 ```powershell
 python .agents/skills/antigravity-delegate/scripts/control.py run "补充 README 安装说明" --allow README.md --check "git diff --check"
 ```

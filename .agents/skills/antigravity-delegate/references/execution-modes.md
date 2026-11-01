@@ -31,7 +31,8 @@ check 默认按 argv、`shell: false` 执行；只有契约显式写 `shell: tru
 
 ## 本地能力映射
 
-每次 agy 运行前探测 `--version`、`--help`、`agent`、`agents` 和 `agent list`。
+首次使用或排障时运行 doctor（读取 `--help`）；probe 保存 `--version`、`--help` 日志。
+探测不运行 agent/agents 等可能进入会话的命令。实际启动按所选模式验证帮助声明的参数。
 帮助输出是参数与模式支持情况的依据。已知模式有 `accept-edits` 和 `plan`，
 但 Adapter 不能硬编码假定它们必然可用。
 

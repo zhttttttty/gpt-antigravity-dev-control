@@ -182,6 +182,9 @@ def validate_task(root, task_id, quiet=False):
                 errors.append(f"checks.{check_group} must contain command mappings")
             elif any("shell" in item and type(item["shell"]) is not bool for item in items):
                 errors.append(f"checks.{check_group} shell must be boolean")
+            elif any("timeout_seconds" in item and (type(item["timeout_seconds"]) is not int
+                     or item["timeout_seconds"] <= 0) for item in items):
+                errors.append(f"checks.{check_group} timeout_seconds must be a positive integer")
         if not required_check_items(data):
             errors.append("checks requires at least one adversarial, fast, final, or legacy required command")
         for section in ("authority", "risk_controls"):

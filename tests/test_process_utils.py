@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 import shlex
 import subprocess
@@ -60,6 +61,44 @@ class CheckProcessTests(unittest.TestCase):
         self.assertIn("CHILD_STARTED", log.read_text())
         time.sleep(3)
         self.assertFalse(marker.exists(), "Timed-out check left its child process running")
+
+    @unittest.skipIf(os.name == "nt", "POSIX controlling-terminal regression")
+    def test_interactive_child_retains_controlling_terminal(self):
+        import pty
+        import select
+        pid, fd = pty.fork()
+        if pid == 0:
+            try:
+                result = run_command([sys.executable, "-c",
+                    "import os; fd=os.open('/dev/tty',os.O_RDWR); os.close(fd); "
+                    "assert os.tcgetpgrp(0)==os.getpgrp(); "
+                    "print('TTY_READY',flush=True); assert input()=='hello'"],
+                    cwd=self.root, log=self.root / "tty.log", timeout=8, interactive=True)
+                print('TTY_RESULT=' + json.dumps(result), flush=True)
+                os._exit(0 if result["exit_code"] == 0 else 1)
+            except BaseException:
+                os._exit(2)
+        output = b""
+        sent = False
+        try:
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline:
+                if select.select([fd], [], [], .2)[0]:
+                    try:
+                        chunk = os.read(fd, 65536)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    output += chunk
+                    if not sent and b"TTY_READY" in output:
+                        os.write(fd, b"hello\n"); sent = True
+                    if b"TTY_RESULT=" in output:
+                        break
+            self.assertIn(b'"exit_code": 0', output, output.decode(errors='replace'))
+        finally:
+            os.close(fd)
+            os.waitpid(pid, 0)
 
 
 if __name__ == "__main__":

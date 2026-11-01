@@ -10,6 +10,10 @@ agy 实现有界修改。已有用户授权按当前会话适用，小改可由�
 
 ## 日常入口
 
+首次使用或遇到环境问题先运行 `control.py doctor`，按其提示解决依赖、源状态和 CLI 问题。
+自检只读取 Git 和 agy 帮助，不启动模型；不要求 init。依赖安装后，复制进项目的 Skill 也需纳入审查后的提交，
+或使用现有 Skill 的绝对脚本路径加 `--repo` 调用，避免每个项目重复安装文件。
+
 适合范围清楚、低判断且可确定验收的机械修改，不需要额外创建 Codex 中转子代理。
 在已安装 Skill 的目标 Git 项目根目录运行：
 
@@ -24,6 +28,8 @@ run 无需 init、模型配置或七文件契约，要求干净且已有提交�
 需要真实终端处理确认时显式使用 --interactive，不静默绕过权限。
 
 收到 READY_FOR_REVIEW 后读取 result_file、Diff、全部未跟踪文件和检查日志，核对实际结果。
+用 `control.py runs` 列出轻量运行，`runs RUN-ID` 或 `runs latest` 恢复完整结果；latest 指最近更新记录。
+查询不创建新任务、不调用 agy。结果含 next_step，明确检查及整合责任。
 控制台列表最多 20 项，完整清单保存在 result_file；tracked.diff 不包含新增未跟踪文件。
 检查未提供时为 NOT_RUN，非零退出、无效报告、范围违规或失败检查不能当成完成。
 不要自动合并、重试、删除现场，或将执行器的 COMPLETE 当作独立验收。
@@ -32,7 +38,7 @@ run 无需 init、模型配置或七文件契约，要求干净且已有提交�
 ## 什么时候升级为完整协议
 
 架构、认证、安全、迁移、部署、破坏性或需要持久审批/多轮返工的任务，先建立完整任务契约。
-使用 init/create/validate/route，再选择 direct 的 start 或本地委派 prepare/launch/collect。
+使用 init/create/validate/route，再选择 direct 的 start 或本地委派 prepare/launch/verify/collect。
 高级 route 同时返回 mode 和 backend。高判断、语义、安全、架构、强连续性或验收不确定的工作默认 direct；
 Root 选择 direct 后可明确派发有界 worker，不必先等待 agy 故障。
 agy 只写 IMPLEMENTED，退出后运行 verify 的获批检查矩阵，再 collect；不能把实现声明当成验证完成。
